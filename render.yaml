@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: sqled
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
