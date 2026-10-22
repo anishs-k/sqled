@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Data Studio • Universal SQL & Dump Table Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0B0F19;
+      --bg-sidebar: #111827;
+      --bg-card: #1E293B;
+      --bg-card-hover: #283548;
+      --bg-glass: rgba(17, 24, 39, 0.75);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-focus: #6366F1;
+      --text-main: #F8FAFC;
+      --text-muted: #94A3B8;
+      --text-dim: #64748B;
+      --accent: #6366F1;
+      --accent-hover: #4F46E5;
+      --accent-glow: rgba(99, 102, 241, 0.3);
+      --accent-gradient: linear-gradient(135deg, #6366F1, #8B5CF6);
+      --badge-green-bg: rgba(16, 185, 129, 0.15);
+      --badge-green-text: #34D399;
+      --badge-red-bg: rgba(239, 68, 68, 0.15);
+      --badge-red-text: #F87171;
+      --badge-gold-bg: rgba(245, 158, 11, 0.15);
+      --badge-gold-text: #FBBF24;
+      --badge-blue-bg: rgba(59, 130, 246, 0.15);
+      --badge-blue-text: #60A5FA;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-base);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* Top Navigation */
+    .navbar {
+      height: 60px;
+      background: var(--bg-sidebar);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      flex-shrink: 0;
+      z-index: 50;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 36px;
+      height: 36px;
+      background: var(--accent-gradient);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      color: white;
+      box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    .brand-text h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .brand-text p {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .file-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      border: 1px solid var(--border-color);
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .file-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10B981;
+      box-shadow: 0 0 8px #10B981;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      color: var(--text-main);
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .btn:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      border-color: var(--accent-hover);
+      box-shadow: 0 6px 18px var(--accent-glow);
+    }
+
+    /* Main Container */
+    .app-body {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Upload Screen Overlay */
+    .upload-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-base);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      transition: opacity 0.3s ease, visibility 0.3s ease;
+      padding: 24px;
+    }
+
+    .upload-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .dropzone-card {
+      width: 100%;
+      max-width: 680px;
+      background: var(--bg-sidebar);
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 50px 40px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .dropzone-card:hover, .dropzone-card.drag-over {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.04);
+      transform: translateY(-4px);
+      box-shadow: 0 25px 60px rgba(99, 102, 241, 0.15);
+    }
+
+    .drop-icon-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: rgba(99, 102, 241, 0.12);
+      border: 1px solid rgba(99, 102, 241, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      color: var(--accent);
+      font-size: 36px;
+      transition: all 0.3s;
+    }
+
+    .dropzone-card:hover .drop-icon-wrap {
+      transform: scale(1.08);
+      background: var(--accent-gradient);
+      color: white;
+    }
+
+    .drop-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      letter-spacing: -0.02em;
+    }
+
+    .drop-sub {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .supported-tags {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+
+    .tag-badge {
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border-color);
+      padding: 4px 10px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .or-divider {
+      display: flex;
+      align-items: center;
+      margin: 24px 0;
+      color: var(--text-dim);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .or-divider::before, .or-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .or-divider span {
+      padding: 0 16px;
+    }
+
+    .sample-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px 20px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .sample-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 290px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .search-input-box {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px 8px 34px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, 0.05);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    .search-icon-svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-dim);
+      pointer-events: none;
+    }
+
+    .table-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      list-style: none;
+    }
+
+    .table-list-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 3px;
+      transition: all 0.15s;
+    }
+
+    .table-list-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+    }
+
+    .table-list-item.active {
+      background: var(--accent);
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    .table-list-item.active .row-count-badge {
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+    }
+
+    .table-name-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-right: 8px;
+    }
+
+    .row-count-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-family: 'JetBrains Mono', monospace;
+      flex-shrink: 0;
+    }
+
+    .sidebar-footer {
+      padding: 14px 16px;
+      border-top: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.15);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Content Area */
+    .content-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg-base);
+    }
+
+    .table-toolbar {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-glass);
+      backdrop-filter: blur(12px);
+      flex-shrink: 0;
+    }
+
+    .toolbar-left {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .active-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .meta-tag {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      padding: 4px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Filter Controls Bar */
+    .controls-strip {
+      padding: 10px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(17, 24, 39, 0.4);
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .search-filter-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      max-width: 520px;
+    }
+
+    .search-filter-wrap .search-input-box {
+      flex: 1;
+    }
+
+    .select-dropdown {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .select-dropdown option {
+      background: var(--bg-sidebar);
+      color: var(--text-main);
+    }
+
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .page-nav-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .page-nav-btn:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .page-nav-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    /* Data Table View */
+    .grid-wrapper {
+      flex: 1;
+      overflow: auto;
+      background: var(--bg-base);
+    }
+
+    table.data-grid {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    table.data-grid th {
+      position: sticky;
+      top: 0;
+      background: #151D2A;
+      color: #94A3B8;
+      font-weight: 600;
+      font-size: 12px;
+      padding: 12px 16px;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+      z-index: 10;
+      transition: all 0.15s;
+    }
+
+    table.data-grid th:hover {
+      color: #F8FAFC;
+      background: #1C2636;
+    }
+
+    table.data-grid th .sort-icon {
+      margin-left: 6px;
+      font-size: 10px;
+      color: var(--text-dim);
+    }
+
+    table.data-grid th.sorted .sort-icon {
+      color: var(--accent);
+    }
+
+    table.data-grid td {
+      padding: 10px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      color: #E2E8F0;
+      white-space: nowrap;
+      max-width: 380px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      user-select: text;
+    }
+
+    table.data-grid tr {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    table.data-grid tr:hover td {
+      background: rgba(255, 255, 255, 0.035);
+    }
+
+    .cell-null {
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .pill-bool {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .pill-true {
+      background: var(--badge-green-bg);
+      color: var(--badge-green-text);
+    }
+
+    .pill-false {
+      background: var(--badge-red-bg);
+      color: var(--badge-red-text);
+    }
+
+    .pill-json {
+      color: var(--badge-gold-text);
+      background: var(--badge-gold-bg);
+      padding: 2px 7px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    /* Modal / Drawer for Row Details */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(6px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.25s ease;
+      padding: 24px;
+    }
+
+    .modal-backdrop.open {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-card {
+      width: 100%;
+      max-width: 780px;
+      max-height: 85vh;
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+      transform: translateY(20px);
+      transition: transform 0.25s ease;
+      overflow: hidden;
+    }
+
+    .modal-backdrop.open .modal-card {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 20px;
+      padding: 4px 8px;
+      border-radius: 6px;
+    }
+
+    .close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+    }
+
+    .modal-body {
+      padding: 20px 24px;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .detail-row {
+      margin-bottom: 16px;
+    }
+
+    .detail-col-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .detail-val-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #E2E8F0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      user-select: text;
+    }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1E293B;
+      color: #F8FAFC;
+      border: 1px solid var(--border-color);
+      padding: 12px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transform: translateY(80px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      z-index: 300;
+    }
+
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    /* Hidden File Input */
+    #hiddenFileInput {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="brand-logo">SQL</div>
+      <div class="brand-text">
+        <h1>SQL Data Studio</h1>
+        <p>Universal Table & Dump Explorer</p>
+      </div>
+    </div>
+
+    <div class="nav-actions">
+      <div class="file-badge" id="activeFileBadge" style="display: none;">
+        <span class="dot"></span>
+        <span id="activeFileName">file.sql</span>
+      </div>
+
+      <button class="btn" onclick="triggerFileUpload()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        Open Another File
+      </button>
+    </div>
+  </header>
+
+  <!-- App Body -->
+  <div class="app-body">
+
+    <!-- Upload Screen Overlay (shown if no file loaded) -->
+    <div class="upload-overlay" id="uploadOverlay">
+      <div class="dropzone-card" id="dropzoneCard" onclick="triggerFileUpload()">
+        <div class="drop-icon-wrap">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+        </div>
+        <h2 class="drop-title">Drop your SQL, Dump, or CSV file here</h2>
+        <p class="drop-sub">Drag and drop your database file, or click anywhere inside to browse.<br>100% private & client-side — your data never leaves your browser.</p>
+
+        <div class="supported-tags">
+          <span class="tag-badge">.SQL (PostgreSQL / MySQL / SQLite)</span>
+          <span class="tag-badge">.CSV</span>
+          <span class="tag-badge">.JSON</span>
+        </div>
+
+        <button class="btn btn-primary" onclick="event.stopPropagation(); triggerFileUpload();">
+          Browse Computer
+        </button>
+
+        <div class="or-divider"><span>OR QUICK TEST</span></div>
+
+        <button class="sample-btn" id="sampleDataBtn" onclick="event.stopPropagation(); loadSampleCtwData();">
+          ⚡ Load Sample Data (ctw.sql • 18 Tables)
+        </button>
+      </div>
+    </div>
+
+    <!-- Left Sidebar: Tables List -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="search-input-box">
+          <svg class="search-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="tableSearchInput" class="search-input" placeholder="Search tables..." oninput="filterTableList()">
+        </div>
+      </div>
+
+      <ul class="table-list" id="tableListContainer">
+        <!-- Rendered via JS -->
+      </ul>
+
+      <div class="sidebar-footer">
+        <span id="sidebarTotalTables">0 Tables</span>
+        <span id="sidebarTotalRows">0 Total Records</span>
+      </div>
+    </aside>
+
+    <!-- Right Content Area -->
+    <main class="content-area">
+      <!-- Toolbar -->
+      <div class="table-toolbar">
+        <div class="toolbar-left">
+          <h2 class="active-title" id="activeTableHeading">Select a Table</h2>
+          <span class="meta-tag" id="activeTableMeta">0 rows • 0 columns</span>
+        </div>
+
+        <div class="toolbar-actions">
+          <button class="btn" onclick="exportTableCSV()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export CSV
+          </button>
+          <button class="btn" onclick="exportTableJSON()">
+            Export JSON
+          </button>
+        </div>
+      </div>
+
+      <!-- Controls & Search Strip -->
+      <div class="controls-strip">
+        <div class="search-filter-wrap">
+          <div class="search-input-box">
+            <svg class="search-icon-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="gridSearchInput" class="search-input" placeholder="Filter rows in active table..." oninput="onFilterChange()">
+          </div>
+
+          <select id="columnFilterSelect" class="select-dropdown" onchange="onFilterChange()">
+            <option value="ALL">All Columns</option>
+          </select>
+        </div>
+
+        <div class="pagination-bar">
+          <span>Rows per page:</span>
+          <select id="rowsPerPageSelect" class="select-dropdown" onchange="onPageSizeChange()">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="ALL">All</option>
+          </select>
+
+          <span id="pageInfoText">1 - 25 of 100</span>
+
+          <button class="page-nav-btn" id="prevPageBtn" onclick="prevPage()">‹</button>
+          <button class="page-nav-btn" id="nextPageBtn" onclick="nextPage()">›</button>
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="grid-wrapper">
+        <table class="data-grid" id="mainDataGrid">
+          <thead id="gridHead"></thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Row Detail Modal -->
+  <div class="modal-backdrop" id="rowModal" onclick="closeRowModal(event)">
+    <div class="modal-card" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalRowTitle">Record Details</h3>
+        <button class="close-btn" onclick="closeRowModal()">✕</button>
+      </div>
+      <div class="modal-body" id="modalRowBody">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toastBox">
+    <span id="toastMsg">Notification</span>
+  </div>
+
+  <!-- Hidden File Input -->
+  <input type="file" id="hiddenFileInput" accept=".sql,.csv,.tsv,.json" onchange="handleFileSelect(event)">
+
+  <script>
+    // State Store
+    let currentDatabase = {}; // { tableName: { columns: [], rows: [] } }
+    let activeTableName = '';
+    let sortColumnIdx = null;
+    let sortAsc = true;
+    let currentPage = 1;
+    let pageSize = 25;
+    let filteredRows = [];
+
+    // Drag and drop handlers
+    const dropzone = document.getElementById('dropzoneCard');
+    const uploadOverlay = document.getElementById('uploadOverlay');
+
+    window.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('drag-over');
+    });
+
+    window.addEventListener('dragleave', (e) => {
+      if (e.clientX === 0 || e.clientY === 0) {
+        dropzone.classList.remove('drag-over');
+      }
+    });
+
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function triggerFileUpload() {
+      document.getElementById('hiddenFileInput').click();
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        processFile(file);
+      }
+    }
+
+    function processFile(file) {
+      showToast(`Loading & parsing ${file.name}...`);
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const text = e.target.result;
+        try {
+          const startTime = performance.now();
+          if (file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
+            parseCSVContent(file.name, text, file.name.endsWith('.tsv') ? '\t' : ',');
+          } else if (file.name.endsWith('.json')) {
+            parseJSONContent(file.name, text);
+          } else {
+            // Assume SQL
+            parseSQLDump(text);
+          }
+          const duration = ((performance.now() - startTime) / 1000).toFixed(2);
+
+          // Update UI
+          document.getElementById('activeFileName').textContent = `${file.name} (${formatBytes(file.size)})`;
+          document.getElementById('activeFileBadge').style.display = 'inline-flex';
+          uploadOverlay.classList.add('hidden');
+
+          initDatabaseView();
+          showToast(`Loaded ${Object.keys(currentDatabase).length} tables in ${duration}s!`);
+        } catch (err) {
+          console.error(err);
+          alert('Error parsing file: ' + err.message);
+        }
+      };
+
+      reader.readAsText(file);
+    }
+
+    // High Performance SQL Parser
+    function parseSQLDump(sqlText) {
+      const statements = splitSQLStatements(sqlText);
+      const tables = {};
+
+      // CREATE TABLE
+      for (const stmt of statements) {
+        const createMatch = stmt.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:["`\w]+\.)?["`]?([a-zA-Z0-9_]+)["`]?\s*\(([\s\S]*)\)$/i);
+        if (createMatch) {
+          const tblName = createMatch[1];
+          const body = createMatch[2];
+          const columns = [];
+          const lines = body.split('\n');
+          for (let rawLine of lines) {
+            let line = rawLine.trim().replace(/,$/, '');
+            if (!line || line.startsWith('--') || line.startsWith('/*')) continue;
+            const upper = line.toUpperCase();
+            if (
+              upper.startsWith('CONSTRAINT') ||
+              upper.startsWith('PRIMARY KEY') ||
+              upper.startsWith('FOREIGN KEY') ||
+              upper.startsWith('UNIQUE') ||
+              upper.startsWith('CHECK') ||
+              upper.startsWith('KEY ') ||
+              upper.startsWith('INDEX ')
+            ) {
+              continue;
+            }
+            const colMatch = line.match(/^["`]?([a-zA-Z0-9_]+)["`]?/);
+            if (colMatch && !columns.includes(colMatch[1])) {
+              columns.push(colMatch[1]);
+            }
+          }
+          if (!tables[tblName]) {
+            tables[tblName] = { columns, rows: [] };
+          } else if (tables[tblName].columns.length === 0) {
+            tables[tblName].columns = columns;
+          }
+        }
+      }
+
+      // INSERT INTO
+      for (const stmt of statements) {
+        const insertMatch = stmt.match(/^INSERT\s+INTO\s+(?:["`\w]+\.)?["`]?([a-zA-Z0-9_]+)["`]?\s*(?:\(([\s\S]*?)\))?\s*VALUES\s*([\s\S]*)$/i);
+        if (insertMatch) {
+          const tblName = insertMatch[1];
+          const explicitCols = insertMatch[2]
+            ? insertMatch[2].split(',').map(c => c.trim().replace(/["`]/g, ''))
+            : null;
+          const valuesBody = insertMatch[3];
+
+          if (!tables[tblName]) {
+            tables[tblName] = { columns: explicitCols || [], rows: [] };
+          } else if (explicitCols && tables[tblName].columns.length === 0) {
+            tables[tblName].columns = explicitCols;
+          }
+
+          const tuples = extractTuples(valuesBody);
+          for (const t of tuples) {
+            const row = parseValueTuple(t);
+            tables[tblName].rows.push(row);
+          }
+        }
+      }
+
+      // Generate column names if empty
+      for (const tbl in tables) {
+        const t = tables[tbl];
+        if (t.columns.length === 0 && t.rows.length > 0) {
+          const maxLen = Math.max(...t.rows.map(r => r.length));
+          t.columns = Array.from({ length: maxLen }, (_, i) => `col_${i + 1}`);
+        }
+      }
+
+      currentDatabase = tables;
+    }
+
+    function splitSQLStatements(sql) {
+      const statements = [];
+      let current = [];
+      let inString = false;
+      let quoteChar = '';
+      let inLineComment = false;
+      let inBlockComment = false;
+      let inDollarQuote = false;
+      let dollarTag = '';
+      const n = sql.length;
+      let i = 0;
+
+      while (i < n) {
+        const c = sql[i];
+        const next = i + 1 < n ? sql[i + 1] : '';
+
+        if (inLineComment) {
+          if (c === '\n') inLineComment = false;
+          i++;
+          continue;
+        }
+        if (inBlockComment) {
+          if (c === '*' && next === '/') {
+            inBlockComment = false;
+            i += 2;
+            continue;
+          }
+          i++;
+          continue;
+        }
+        if (inDollarQuote) {
+          if (sql.startsWith(dollarTag, i)) {
+            current.push(dollarTag);
+            i += dollarTag.length;
+            inDollarQuote = false;
+            continue;
+          }
+          current.push(c);
+          i++;
+          continue;
+        }
+
+        if (inString) {
+          current.push(c);
+          if (c === quoteChar) {
+            if (quoteChar === "'" && next === "'") {
+              current.push("'");
+              i += 2;
+              continue;
+            } else {
+              inString = false;
+            }
+          } else if (c === '\\') {
+            if (i + 1 < n) {
+              current.push(next);
+              i += 2;
+              continue;
+            }
+          }
+          i++;
+          continue;
+        }
+
+        if (c === '-' && next === '-') {
+          inLineComment = true;
+          i += 2;
+          continue;
+        }
+        if (c === '/' && next === '*') {
+          inBlockComment = true;
+          i += 2;
+          continue;
+        }
+        if (c === "'" || c === '"') {
+          inString = true;
+          quoteChar = c;
+          current.push(c);
+          i++;
+          continue;
+        }
+        if (c === '$') {
+          const match = sql.slice(i).match(/^\$([a-zA-Z0-9_]*)\$/);
+          if (match) {
+            dollarTag = match[0];
+            inDollarQuote = true;
+            current.push(dollarTag);
+            i += dollarTag.length;
+            continue;
+          }
+        }
+
+        if (c === ';') {
+          const stmt = current.join('').trim();
+          if (stmt) statements.push(stmt);
+          current = [];
+          i++;
+          continue;
+        }
+
+        current.push(c);
+        i++;
+      }
+      const last = current.join('').trim();
+      if (last) statements.push(last);
+      return statements;
+    }
+
+    function extractTuples(body) {
+      const tuples = [];
+      let inParen = false;
+      let inQuote = false;
+      let current = [];
+      let i = 0;
+      const n = body.length;
+
+      while (i < n) {
+        const c = body[i];
+        const next = i + 1 < n ? body[i + 1] : '';
+
+        if (inQuote) {
+          current.push(c);
+          if (c === "'") {
+            if (next === "'") {
+              current.push("'");
+              i += 2;
+              continue;
+            } else {
+              inQuote = false;
+            }
+          } else if (c === '\\' && next) {
+            current.push(next);
+            i += 2;
+            continue;
+          }
+          i++;
+          continue;
+        }
+
+        if (c === "'") {
+          inQuote = true;
+          current.push(c);
+          i++;
+          continue;
+        }
+
+        if (c === '(') {
+          if (!inParen) {
+            inParen = true;
+            current = [];
+          } else {
+            current.push(c);
+          }
+          i++;
+          continue;
+        }
+
+        if (c === ')') {
+          if (inParen) {
+            tuples.push(current.join(''));
+            inParen = false;
+            current = [];
+          } else {
+            current.push(c);
+          }
+          i++;
+          continue;
+        }
+
+        if (inParen) {
+          current.push(c);
+        }
+        i++;
+      }
+      return tuples;
+    }
+
+    function parseValueTuple(tupleStr) {
+      const values = [];
+      let inQuote = false;
+      let current = [];
+      let i = 0;
+      const n = tupleStr.length;
+
+      while (i < n) {
+        const c = tupleStr[i];
+        const next = i + 1 < n ? tupleStr[i + 1] : '';
+
+        if (inQuote) {
+          if (c === "'") {
+            if (next === "'") {
+              current.push("'");
+              i += 2;
+              continue;
+            } else {
+              inQuote = false;
+              i++;
+              continue;
+            }
+          } else if (c === '\\' && next) {
+            current.push(next);
+            i += 2;
+            continue;
+          }
+          current.push(c);
+          i++;
+          continue;
+        }
+
+        if (c === "'") {
+          inQuote = true;
+          i++;
+          continue;
+        }
+
+        if (c === ',') {
+          values.push(cleanVal(current.join('').trim()));
+          current = [];
+          i++;
+          continue;
+        }
+
+        current.push(c);
+        i++;
+      }
+      if (current.length > 0) {
+        values.push(cleanVal(current.join('').trim()));
+      }
+      return values;
+    }
+
+    function cleanVal(v) {
+      if (v === '' || v.toUpperCase() === 'NULL') return null;
+      if (v.toLowerCase() === 'true') return true;
+      if (v.toLowerCase() === 'false') return false;
+      return v;
+    }
+
+    // CSV and JSON parsers
+    function parseCSVContent(filename, text, delimiter) {
+      const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+      if (lines.length === 0) return;
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^["']|["']$/g, ''));
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+        rows.push(cols);
+      }
+      const tblName = filename.replace(/\.[^/.]+$/, "");
+      currentDatabase = { [tblName]: { columns: headers, rows: rows } };
+    }
+
+    function parseJSONContent(filename, text) {
+      const parsed = JSON.parse(text);
+      const arr = Array.isArray(parsed) ? parsed : [parsed];
+      if (arr.length === 0) return;
+      const columns = Object.keys(arr[0]);
+      const rows = arr.map(obj => columns.map(c => obj[c]));
+      const tblName = filename.replace(/\.[^/.]+$/, "");
+      currentDatabase = { [tblName]: { columns: columns, rows: rows } };
+    }
+
+    // Initialize UI after parsing
+    function initDatabaseView() {
+      const tableNames = Object.keys(currentDatabase);
+      if (tableNames.length === 0) {
+        alert('No tables found in this file!');
+        return;
+      }
+
+      // Calculate totals
+      let totalRows = 0;
+      tableNames.forEach(t => totalRows += currentDatabase[t].rows.length);
+
+      document.getElementById('sidebarTotalTables').textContent = `${tableNames.length} Tables`;
+      document.getElementById('sidebarTotalRows').textContent = `${totalRows} Total Records`;
+
+      activeTableName = tableNames[0];
+      renderSidebar();
+      loadTable(activeTableName);
+    }
+
+    function renderSidebar() {
+      const listEl = document.getElementById('tableListContainer');
+      listEl.innerHTML = '';
+      const filter = document.getElementById('tableSearchInput').value.toLowerCase();
+
+      Object.keys(currentDatabase).forEach(tbl => {
+        if (filter && !tbl.toLowerCase().includes(filter)) return;
+        const item = document.createElement('li');
+        item.className = 'table-list-item' + (tbl === activeTableName ? ' active' : '');
+        item.onclick = () => loadTable(tbl);
+
+        item.innerHTML = `
+          <span class="table-name-text" title="${tbl}">${tbl}</span>
+          <span class="row-count-badge">${currentDatabase[tbl].rows.length}</span>
+        `;
+        listEl.appendChild(item);
+      });
+    }
+
+    function filterTableList() {
+      renderSidebar();
+    }
+
+    function loadTable(tblName) {
+      activeTableName = tblName;
+      sortColumnIdx = null;
+      sortAsc = true;
+      currentPage = 1;
+      document.getElementById('gridSearchInput').value = '';
+
+      renderSidebar();
+
+      const tableData = currentDatabase[tblName];
+      document.getElementById('activeTableHeading').textContent = tblName;
+      document.getElementById('activeTableMeta').textContent = `${tableData.rows.length} rows • ${tableData.columns.length} columns`;
+
+      // Update Column Filter dropdown
+      const colSelect = document.getElementById('columnFilterSelect');
+      colSelect.innerHTML = '<option value="ALL">All Columns</option>' +
+        tableData.columns.map((c, i) => `<option value="${i}">${c}</option>`).join('');
+
+      renderGrid();
+    }
+
+    function renderGrid() {
+      if (!activeTableName || !currentDatabase[activeTableName]) return;
+      const tblData = currentDatabase[activeTableName];
+
+      // 1. Render Table Headers
+      const thead = document.getElementById('gridHead');
+      thead.innerHTML = `
+        <tr>
+          <th style="width: 48px; text-align: center;">#</th>
+          ${tblData.columns.map((col, idx) => `
+            <th class="${sortColumnIdx === idx ? 'sorted' : ''}" onclick="toggleSort(${idx})">
+              ${col}
+              <span class="sort-icon">${sortColumnIdx === idx ? (sortAsc ? '▲' : '▼') : '↕'}</span>
+            </th>
+          `).join('')}
+        </tr>
+      `;
+
+      // 2. Filter Rows
+      const searchQuery = document.getElementById('gridSearchInput').value.toLowerCase();
+      const colFilter = document.getElementById('columnFilterSelect').value;
+
+      filteredRows = tblData.rows.filter(row => {
+        if (!searchQuery) return true;
+        if (colFilter === 'ALL') {
+          return row.some(cell => String(cell ?? '').toLowerCase().includes(searchQuery));
+        } else {
+          const cell = row[Number(colFilter)];
+          return String(cell ?? '').toLowerCase().includes(searchQuery);
+        }
+      });
+
+      // 3. Sort Rows
+      if (sortColumnIdx !== null) {
+        filteredRows.sort((a, b) => {
+          let valA = a[sortColumnIdx];
+          let valB = b[sortColumnIdx];
+          if (valA === valB) return 0;
+          if (valA === null || valA === undefined) return 1;
+          if (valB === null || valB === undefined) return -1;
+          const cmp = typeof valA === 'number' && typeof valB === 'number'
+            ? valA - valB
+            : String(valA).localeCompare(String(valB));
+          return sortAsc ? cmp : -cmp;
+        });
+      }
+
+      // 4. Pagination
+      const totalFiltered = filteredRows.length;
+      let startIdx = 0;
+      let endIdx = totalFiltered;
+
+      if (pageSize !== 'ALL') {
+        const size = Number(pageSize);
+        const maxPages = Math.max(1, Math.ceil(totalFiltered / size));
+        if (currentPage > maxPages) currentPage = maxPages;
+        startIdx = (currentPage - 1) * size;
+        endIdx = Math.min(startIdx + size, totalFiltered);
+
+        document.getElementById('pageInfoText').textContent = totalFiltered > 0
+          ? `${startIdx + 1} - ${endIdx} of ${totalFiltered}`
+          : `0 of 0`;
+        document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+        document.getElementById('nextPageBtn').disabled = currentPage >= maxPages;
+      } else {
+        document.getElementById('pageInfoText').textContent = `Showing all ${totalFiltered}`;
+        document.getElementById('prevPageBtn').disabled = true;
+        document.getElementById('nextPageBtn').disabled = true;
+      }
+
+      const pagedRows = filteredRows.slice(startIdx, endIdx);
+
+      // 5. Render Table Body
+      const tbody = document.getElementById('gridBody');
+      if (pagedRows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${tblData.columns.length + 1}" style="text-align: center; padding: 48px; color: var(--text-dim);">No records found matching query</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = pagedRows.map((row, rIdx) => {
+        const absoluteIndex = startIdx + rIdx;
+        return `
+          <tr onclick="openRowModal(${absoluteIndex})">
+            <td style="text-align: center; color: var(--text-dim); font-size: 11px;">${absoluteIndex + 1}</td>
+            ${row.map(cell => formatCellHtml(cell)).join('')}
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function formatCellHtml(val) {
+      if (val === null || val === undefined || val === '') {
+        return `<td class="cell-null">NULL</td>`;
+      }
+      if (val === true || val === 'True' || val === 'true' || val === 't') {
+        return `<td><span class="pill-bool pill-true">TRUE</span></td>`;
+      }
+      if (val === false || val === 'False' || val === 'false' || val === 'f') {
+        return `<td><span class="pill-bool pill-false">FALSE</span></td>`;
+      }
+      const str = String(val);
+      if (str.startsWith('{') || str.startsWith('[')) {
+        return `<td title="Click row to view full JSON"><span class="pill-json">${escapeHtml(str.length > 40 ? str.slice(0, 40) + '...' : str)}</span></td>`;
+      }
+      return `<td title="${escapeHtml(str)}">${escapeHtml(str)}</td>`;
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function toggleSort(colIdx) {
+      if (sortColumnIdx === colIdx) {
+        sortAsc = !sortAsc;
+      } else {
+        sortColumnIdx = colIdx;
+        sortAsc = true;
+      }
+      renderGrid();
+    }
+
+    function onFilterChange() {
+      currentPage = 1;
+      renderGrid();
+    }
+
+    function onPageSizeChange() {
+      pageSize = document.getElementById('rowsPerPageSelect').value;
+      currentPage = 1;
+      renderGrid();
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        renderGrid();
+      }
+    }
+
+    function nextPage() {
+      const size = Number(pageSize);
+      if (currentPage * size < filteredRows.length) {
+        currentPage++;
+        renderGrid();
+      }
+    }
+
+    // Modal Details View
+    function openRowModal(index) {
+      const row = filteredRows[index];
+      if (!row) return;
+      const tblData = currentDatabase[activeTableName];
+
+      document.getElementById('modalRowTitle').textContent = `${activeTableName} • Record #${index + 1}`;
+      const body = document.getElementById('modalRowBody');
+      body.innerHTML = tblData.columns.map((col, i) => {
+        let val = row[i];
+        let prettyVal = val === null ? 'NULL' : String(val);
+        try {
+          if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+            prettyVal = JSON.stringify(JSON.parse(val), null, 2);
+          }
+        } catch (e) {}
+
+        return `
+          <div class="detail-row">
+            <div class="detail-col-name">${col}</div>
+            <div class="detail-val-box">${escapeHtml(prettyVal)}</div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('rowModal').classList.add('open');
+    }
+
+    function closeRowModal(event) {
+      if (!event || event.target.id === 'rowModal' || event.target.className === 'close-btn') {
+        document.getElementById('rowModal').classList.remove('open');
+      }
+    }
+
+    // Export helpers
+    function exportTableCSV() {
+      if (!activeTableName || !currentDatabase[activeTableName]) return;
+      const tbl = currentDatabase[activeTableName];
+      let csv = tbl.columns.map(c => `"${c.replace(/"/g, '""')}"`).join(',') + '\n';
+      tbl.rows.forEach(r => {
+        csv += r.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+      downloadFile(`${activeTableName}.csv`, csv, 'text/csv');
+      showToast(`Exported ${activeTableName}.csv`);
+    }
+
+    function exportTableJSON() {
+      if (!activeTableName || !currentDatabase[activeTableName]) return;
+      const tbl = currentDatabase[activeTableName];
+      const records = tbl.rows.map(r => {
+        let obj = {};
+        tbl.columns.forEach((c, idx) => obj[c] = r[idx]);
+        return obj;
+      });
+      downloadFile(`${activeTableName}.json`, JSON.stringify(records, null, 2), 'application/json');
+      showToast(`Exported ${activeTableName}.json`);
+    }
+
+    function downloadFile(name, content, type) {
+      const blob = new Blob([content], { type: type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastBox');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    // Embedded Sample Data fallback for 1-click test
+    function loadSampleCtwData() {
+      showToast('Loading preloaded CTW sample dataset...');
+      // Sample database representation pre-packaged
+      const sample = {"ctw_admin_user": {"columns": ["admin_id", "login_id", "full_name", "email", "password_hash", "active", "created_at", "last_login_at", "mfa_secret_enc", "mfa_enabled", "mfa_last_step", "recovery_codes", "must_change_password", "password_changed_at", "session_version", "created_by"], "rows": [["5", "ui.tester", "UI Tester", "ui.tester@cybertrustworks.example", "$2a$10$lTNwhYueUhcEZ67G5JiyGegUXmKMA/VCcgj614guhBfWCDHLvBG2q", "False", "2026-10-21 06:07:23.512107+00", "2026-10-21 06:07:27.027568+00", "v1:9zzsbJ_nRL_x0T8r:_rCRQnEpb7qnJk-NZfsQkA:TZHLOCUVd1286-ukE-G8mRHIh9MI7MtoHyMTicWwYvQ", "True", "59752095", "{0fc903f7953e11e10cb6da5c8ded6e573111d685c7507c159de868e52e41f58d,688fd7cce1d2e692f20b0a1894d800177d0e4680f5827996ff4847964944893a,b847a134f8401d8525b8cd1cd0de58f96d5c41a80aa7072bc5fbdbb91311cc18,ada75fb4116edc03b34e574537259adb0fa373dba274fba50be995ff255d30ba,381f020dfbf189eb97d6adbf20c93db2cb2c7c0cad6f9b852fffdd1ba5170355,072e7de474f68b26ce0b27c49b64249125d6a2c77d251e2051735a79d764ecfc,c94f3e2cd48dd9cfe707802f5e79c5481ed8a615b621fb49e5f564432641a3ee,b186e5864b51133591deed1f7bfa87ed0f7666bce59fbbaaf32639d3386d58d4,ba2852b9ed07dfc7d834e3373df5567a49f67da01cc2c2e49282a5f6215b5d6e,1b2667a5586ef3edaf9a5e57e9c25b51f7803fb106403fbfcdc8b49968ffc5e9}", "False", "2026-10-21 06:07:25.005394+00", "4", "1"], ["2", "e2e.ops", "E2E Test Operator", "e2e.ops@cybertrustworks.example", "$2a$10$h1PH.oGx5gjIOIP/tivSN.YLDxECkd9I/aKSDmdWtBh0d7LRz0Umm", "False", "2026-10-21 06:01:50.06547+00", "2026-10-21 06:01:50.287485+00", null, "False", null, "{}", "True", "2026-10-21 06:01:50.407872+00", "5", "1"], ["1", "ctw.admin", "CTW Administrator", "admin@cybertrustworks.example", "$2a$10$gdqo4xMZT4XQq9GHl4gXTed6A6EMLZXgN.GRIvJhUm5NgTMpWbzzu", "True", "2026-10-21 04:54:09.867394+00", "2026-10-21 06:55:36.937025+00", null, "False", null, "{}", "False", null, "8", null], ["7", "anish", "Anish", "anish@gmail.com", "$2a$10$LWEgQtAdxw90yf7lzwgDpeb.g0JvN..V3HmQca0HiBF3F7TxCDcRa", "True", "2026-10-21 06:53:54.199716+00", "2026-10-21 18:15:55.125486+00", null, "False", null, "{}", "False", null, "1", null]]}, "ctw_audit_log": {"columns": ["audit_id", "at", "admin_id", "action", "customer_id", "details"], "rows": [["1", "2026-10-21 04:54:09.91842+00", "1", "admin.create", null, "{}"], ["2", "2026-10-21 04:54:09.922004+00", "1", "client.import", "Cust_00101", "{\"source\": \"spec\"}"], ["3", "2026-10-21 05:02:46.151896+00", "1", "admin.login", null, "{}"], ["4", "2026-10-21 05:02:47.610409+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["5", "2026-10-21 05:02:47.633239+00", "1", "client.create", "Cust_00202", "{}"], ["6", "2026-10-21 05:02:47.695539+00", "1", "client.update", "Cust_00202", "{}"], ["7", "2026-10-21 05:02:48.50956+00", "1", "client.validate", "Cust_00202", "{\"valid\": false, \"errors\": 2}"], ["8", "2026-10-21 05:02:48.51426+00", "1", "client.update", "Cust_00202", "{}"], ["9", "2026-10-21 05:02:49.355401+00", "1", "client.validate", "Cust_00202", "{\"valid\": true, \"errors\": 0}"], ["10", "2026-10-21 05:02:49.410818+00", "1", "client.delete", "Cust_00202", "{}"], ["11", "2026-10-21 05:03:12.619172+00", "1", "admin.login", null, "{}"], ["12", "2026-10-21 05:03:14.686592+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["13", "2026-10-21 05:03:14.695304+00", "1", "client.create", "Cust_00202", "{}"], ["14", "2026-10-21 05:03:14.758866+00", "1", "client.update", "Cust_00202", "{}"], ["15", "2026-10-21 05:03:16.063483+00", "1", "client.validate", "Cust_00202", "{\"valid\": false, \"errors\": 2}"], ["16", "2026-10-21 05:03:16.081854+00", "1", "client.update", "Cust_00202", "{}"], ["17", "2026-10-21 05:03:16.461002+00", "1", "client.validate", "Cust_00202", "{\"valid\": true, \"errors\": 0}"], ["18", "2026-10-21 05:03:16.507536+00", "1", "client.delete", "Cust_00202", "{}"], ["19", "2026-10-21 05:13:25.643109+00", "1", "admin.login", null, "{}"], ["20", "2026-10-21 05:13:26.278489+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["21", "2026-10-21 05:13:26.292022+00", "1", "client.create", "Cust_00202", "{}"], ["22", "2026-10-21 05:13:26.385849+00", "1", "client.update", "Cust_00202", "{}"], ["23", "2026-10-21 05:13:26.824926+00", "1", "client.validate", "Cust_00202", "{\"valid\": false, \"errors\": 2}"], ["24", "2026-10-21 05:13:26.832328+00", "1", "client.update", "Cust_00202", "{}"], ["25", "2026-10-21 05:13:27.301549+00", "1", "client.validate", "Cust_00202", "{\"valid\": true, \"errors\": 0}"], ["26", "2026-10-21 05:13:27.347422+00", "1", "client.delete", "Cust_00202", "{}"], ["27", "2026-10-21 05:13:27.586593+00", "1", "admin.login", null, "{}"], ["28", "2026-10-21 05:13:28.051801+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["29", "2026-10-21 05:13:28.071451+00", "1", "client.create", "Cust_00202", "{}"], ["30", "2026-10-21 05:13:28.165468+00", "1", "client.update", "Cust_00202", "{}"], ["31", "2026-10-21 05:13:28.728754+00", "1", "client.validate", "Cust_00202", "{\"valid\": false, \"errors\": 2}"], ["32", "2026-10-21 05:13:28.737685+00", "1", "client.update", "Cust_00202", "{}"], ["33", "2026-10-21 05:13:29.115185+00", "1", "client.validate", "Cust_00202", "{\"valid\": true, \"errors\": 0}"], ["34", "2026-10-21 05:13:29.149643+00", "1", "client.delete", "Cust_00202", "{}"], ["35", "2026-10-21 05:25:10.646757+00", "1", "admin.login", null, "{}"], ["36", "2026-10-21 05:25:10.697358+00", "1", "client.create", "Cust_00909", "{}"], ["37", "2026-10-21 05:25:10.760068+00", "1", "client.delete", "Cust_00909", "{}"], ["38", "2026-10-21 05:25:10.79102+00", "1", "build.start", "Cust_00101", "{\"version\": 1, \"build_id\": \"2\"}"], ["39", "2026-10-21 05:25:19.82032+00", "1", "build.success", "Cust_00101", "{\"users\": 2, \"version\": 1, \"build_id\": \"2\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00101-v1\"}"], ["40", "2026-10-21 05:25:21.106516+00", "1", "build.credentials", "Cust_00101", "{\"given\": true, \"build_id\": \"2\"}"], ["41", "2026-10-21 05:25:21.123737+00", "1", "build.credentials", "Cust_00101", "{\"given\": false, \"build_id\": \"2\"}"], ["42", "2026-10-21 05:25:21.138859+00", "1", "build.download", "Cust_00101", "{\"file\": \"001_client_init.sql\", \"build_id\": \"2\"}"], ["43", "2026-10-21 05:25:21.187051+00", "1", "build.download", "Cust_00101", "{\"file\": \"docker-compose.yml\", \"build_id\": \"2\"}"], ["44", "2026-10-21 05:25:21.209423+00", "1", "build.download", "Cust_00101", "{\"file\": \"README.md\", \"build_id\": \"2\"}"], ["45", "2026-10-21 05:25:21.251049+00", "1", "build.download", "Cust_00101", "{\"file\": \"instance.json\", \"build_id\": \"2\"}"], ["46", "2026-10-21 05:25:21.266071+00", "1", "build.download", "Cust_00101", "{\"file\": \"client_spec.json\", \"build_id\": \"2\"}"], ["47", "2026-10-21 05:25:21.297002+00", "1", "build.download", "Cust_00101", "{\"file\": \"vciso-platform-cust_00101.tar.gz\", \"build_id\": \"2\"}"], ["48", "2026-10-21 05:27:00.409627+00", "1", "admin.login", null, "{}"], ["49", "2026-10-21 05:27:00.426925+00", "1", "build.start", "Cust_00101", "{\"version\": 2, \"build_id\": \"3\"}"], ["50", "2026-10-21 05:27:09.044242+00", "1", "build.success", "Cust_00101", "{\"users\": 2, \"version\": 2, \"build_id\": \"3\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00101-v2\"}"], ["51", "2026-10-21 05:27:10.467556+00", "1", "build.credentials", "Cust_00101", "{\"given\": true, \"build_id\": \"3\"}"], ["52", "2026-10-21 05:27:10.48968+00", "1", "build.download", "Cust_00101", "{\"file\": \"001_client_init.sql\", \"build_id\": \"3\"}"], ["53", "2026-10-21 05:27:10.522255+00", "1", "build.download", "Cust_00101", "{\"file\": \"docker-compose.yml\", \"build_id\": \"3\"}"], ["54", "2026-10-21 05:27:10.554058+00", "1", "build.download", "Cust_00101", "{\"file\": \"vciso-platform-cust_00101.tar.gz\", \"build_id\": \"3\"}"], ["55", "2026-10-21 05:27:11.12143+00", "1", "client.create", "Cust_00808", "{}"], ["56", "2026-10-21 05:27:12.674549+00", "1", "client.validate", "Cust_00808", "{\"valid\": true, \"errors\": 0}"], ["57", "2026-10-21 05:27:13.192745+00", "1", "admin.login", null, "{}"], ["58", "2026-10-21 05:27:13.206834+00", "1", "build.start", "Cust_00808", "{\"version\": 1, \"build_id\": \"4\"}"], ["59", "2026-10-21 05:27:13.507654+00", "1", "build.failed", "Cust_00808", "{\"error\": \"bundle refused at validate: the specification is not valid: licensing_limits.valid_to (2025-01-01) is already in the past; licensing_limits.valid_to must be after contract_start_date (licence start)\", \"version\": 1, \"build_id\": \"4\"}"], ["60", "2026-10-21 05:40:49.446635+00", "1", "admin.login", null, "{}"], ["61", "2026-10-21 05:40:52.14133+00", "1", "client.update", "Cust_00101", "{}"], ["62", "2026-10-21 05:40:53.804776+00", "1", "build.start", "Cust_00101", "{\"version\": 3, \"build_id\": \"6\", \"build_type\": \"image_only\", \"based_on_build\": \"3\"}"], ["63", "2026-10-21 05:41:01.710472+00", "1", "build.success", "Cust_00101", "{\"version\": 3, \"build_id\": \"6\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00101-v3\", \"build_type\": \"image_only\"}"], ["64", "2026-10-21 05:41:01.933582+00", "1", "build.credentials", "Cust_00101", "{\"given\": false, \"build_id\": \"6\"}"], ["65", "2026-10-21 05:41:01.943787+00", "1", "build.download", "Cust_00101", "{\"file\": \"docker-compose.yml\", \"build_id\": \"6\"}"], ["66", "2026-10-21 05:41:01.958769+00", "1", "build.download", "Cust_00101", "{\"file\": \"UPGRADE.md\", \"build_id\": \"6\"}"], ["67", "2026-10-21 05:41:01.971777+00", "1", "build.download", "Cust_00101", "{\"file\": \"vciso-platform-cust_00101.tar.gz\", \"build_id\": \"6\"}"], ["68", "2026-10-21 05:41:02.60631+00", "1", "build.download", "Cust_00101", "{\"file\": \"instance.json\", \"build_id\": \"6\"}"], ["69", "2026-10-21 05:41:02.650553+00", "1", "client.update", "Cust_00101", "{}"], ["70", "2026-10-21 05:41:03.673412+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["71", "2026-10-21 05:41:04.973424+00", "1", "client.update", "Cust_00101", "{}"], ["72", "2026-10-21 05:41:05.711719+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["73", "2026-10-21 05:41:26.07175+00", "1", "admin.login", null, "{}"], ["74", "2026-10-21 05:41:26.841269+00", "1", "client.update", "Cust_00101", "{}"], ["75", "2026-10-21 05:41:27.226288+00", "1", "client.update", "Cust_00101", "{}"], ["76", "2026-10-21 05:41:28.170743+00", "1", "client.update", "Cust_00101", "{}"], ["77", "2026-10-21 05:41:29.264904+00", "1", "client.validate", "Cust_00101", "{\"valid\": true, \"errors\": 0}"], ["78", "2026-10-21 05:42:03.679913+00", "1", "admin.login", null, "{}"], ["79", "2026-10-21 05:42:04.801243+00", "1", "build.start", "Cust_00101", "{\"version\": 4, \"build_id\": \"7\", \"build_type\": \"full\", \"based_on_build\": null}"], ["80", "2026-10-21 05:42:14.017944+00", "1", "build.success", "Cust_00101", "{\"version\": 4, \"build_id\": \"7\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00101-v4\", \"build_type\": \"full\"}"], ["81", "2026-10-21 05:42:15.124369+00", "1", "build.credentials", "Cust_00101", "{\"given\": true, \"build_id\": \"7\"}"], ["82", "2026-10-21 05:42:15.13457+00", "1", "build.download", "Cust_00101", "{\"file\": \"vciso-platform-cust_00101.tar.gz\", \"build_id\": \"7\"}"], ["83", "2026-10-21 05:42:16.452645+00", "1", "build.start", "Cust_00101", "{\"version\": 5, \"build_id\": \"8\", \"build_type\": \"image_only\", \"based_on_build\": \"7\"}"], ["84", "2026-10-21 05:42:23.873495+00", "1", "build.success", "Cust_00101", "{\"version\": 5, \"build_id\": \"8\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00101-v5\", \"build_type\": \"image_only\"}"], ["85", "2026-10-21 05:42:24.514968+00", "1", "build.download", "Cust_00101", "{\"file\": \"UPGRADE.md\", \"build_id\": \"8\"}"], ["86", "2026-10-21 05:42:48.376207+00", "1", "admin.login", null, "{}"], ["87", "2026-10-21 05:53:26.247841+00", "1", "admin.login", null, "{}"], ["88", "2026-10-21 05:53:27.45066+00", "1", "client.create", "Cust_00303", "{}"], ["89", "2026-10-21 05:53:30.016789+00", "1", "client.validate", "Cust_00303", "{\"valid\": true, \"errors\": 0}"], ["90", "2026-10-21 05:53:30.742979+00", "1", "build.start", "Cust_00303", "{\"version\": 1, \"build_id\": \"9\", \"build_type\": \"full\", \"based_on_build\": null}"], ["91", "2026-10-21 05:53:40.326522+00", "1", "build.success", "Cust_00303", "{\"version\": 1, \"build_id\": \"9\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00303-v1\", \"build_type\": \"full\"}"], ["92", "2026-10-21 05:53:41.722502+00", "1", "build.credentials", "Cust_00303", "{\"given\": true, \"build_id\": \"9\"}"], ["93", "2026-10-21 05:53:43.200493+00", "1", "build.credentials", "Cust_00303", "{\"given\": false, \"build_id\": \"9\"}"], ["94", "2026-10-21 05:54:22.012024+00", "1", "admin.login", null, "{}"], ["95", "2026-10-21 05:54:49.268631+00", "1", "admin.login", null, "{}"], ["96", "2026-10-21 06:01:49.670939+00", "1", "admin.login", null, "{\"mfa\": false}"], ["97", "2026-10-21 06:01:49.747422+00", "1", "admin.mfa_enabled", null, "{}"], ["98", "2026-10-21 06:01:49.901399+00", "1", "admin.login", null, "{\"mfa\": true, \"method\": \"totp\"}"], ["99", "2026-10-21 06:01:49.977709+00", "1", "admin.login", null, "{\"mfa\": true, \"method\": \"recovery_code\"}"], ["100", "2026-10-21 06:01:50.116165+00", "1", "admin.create", null, "{\"admin_id\": 2, \"login_id\": \"e2e.ops\"}"], ["101", "2026-10-21 06:01:50.290197+00", "2", "admin.login", null, "{\"mfa\": false}"], ["102", "2026-10-21 06:01:50.499543+00", "2", "admin.password_change", null, "{}"], ["103", "2026-10-21 06:01:50.537925+00", "1", "admin.deactivate", null, "{\"admin_id\": 2, \"login_id\": \"e2e.ops\"}"], ["104", "2026-10-21 06:01:50.674505+00", "1", "admin.reset_password", null, "{\"admin_id\": 2, \"login_id\": \"e2e.ops\"}"], ["105", "2026-10-21 06:01:50.689069+00", "1", "admin.reset_mfa", null, "{\"admin_id\": 2, \"login_id\": \"e2e.ops\"}"], ["106", "2026-10-21 06:01:50.788087+00", "1", "build.files_removed", "Cust_00101", "{\"freed\": 64148708, \"version\": 1, \"build_id\": \"2\"}"], ["107", "2026-10-21 06:01:50.831965+00", "1", "build.files_removed", "Cust_00101", "{\"freed\": 64148598, \"version\": 2, \"build_id\": \"3\"}"], ["108", "2026-10-21 06:01:50.841783+00", "1", "build.files_removed", "Cust_00101", "{\"freed\": 63930377, \"version\": 3, \"build_id\": \"6\"}"], ["109", "2026-10-21 06:01:53.88331+00", "1", "admin.logout_all", null, "{}"], ["110", "2026-10-21 06:05:06.159098+00", null, "admin.reset_mfa", null, "{\"by\": \"phase 8 test cleanup\", \"login_id\": \"ctw.admin\"}"], ["111", "2026-10-21 06:06:22.368119+00", "1", "admin.login", null, "{\"mfa\": false}"], ["112", "2026-10-21 06:06:23.924645+00", "1", "admin.mfa_enabled", null, "{}"], ["113", "2026-10-21 06:06:25.76607+00", "1", "admin.create", null, "{\"admin_id\": 4, \"login_id\": \"ui.tester\"}"], ["118", "2026-10-21 06:07:20.680096+00", "1", "admin.login", null, "{\"mfa\": false}"], ["119", "2026-10-21 06:07:21.881283+00", "1", "admin.mfa_enabled", null, "{}"], ["120", "2026-10-21 06:07:23.561117+00", "1", "admin.create", null, "{\"admin_id\": 5, \"login_id\": \"ui.tester\"}"], ["121", "2026-10-21 06:07:24.801964+00", "5", "admin.login", null, "{\"mfa\": false}"], ["122", "2026-10-21 06:07:25.097742+00", "5", "admin.password_change", null, "{}"], ["123", "2026-10-21 06:07:25.622332+00", "5", "admin.mfa_enabled", null, "{}"], ["124", "2026-10-21 06:07:27.029693+00", "5", "admin.login", null, "{\"mfa\": true, \"method\": \"totp\"}"], ["125", "2026-10-21 06:07:28.050991+00", "1", "admin.login", null, "{\"mfa\": true, \"method\": \"recovery_code\"}"], ["126", "2026-10-21 06:07:28.925784+00", "1", "admin.deactivate", null, "{\"admin_id\": 5, \"login_id\": \"ui.tester\"}"], ["127", "2026-10-21 06:07:56.319686+00", null, "admin.reset_mfa", null, "{\"by\": \"phase 8 test cleanup\", \"login_id\": \"ctw.admin\"}"], ["128", "2026-10-21 06:51:04.271096+00", null, "admin.create", null, "{\"by\": \"created in the database on request\", \"admin_id\": 6, \"login_id\": \"anujvmahajan\"}"], ["129", "2026-10-21 06:51:04.564007+00", null, "admin.login", null, "{\"mfa\": false, \"admin_login\": \"anujvmahajan\"}"], ["130", "2026-10-21 06:53:54.199716+00", null, "admin.delete", null, "{\"by\": \"removed in the database on request\", \"login_id\": \"anujvmahajan\"}"], ["131", "2026-10-21 06:53:54.199716+00", null, "admin.create", null, "{\"by\": \"created in the database on request\", \"login_id\": \"anish\"}"], ["132", "2026-10-21 06:53:54.639494+00", "7", "admin.login", null, "{\"mfa\": false}"], ["133", "2026-10-21 06:53:54.996933+00", "7", "admin.login", null, "{\"mfa\": false}"], ["134", "2026-10-21 06:55:36.112834+00", "7", "admin.login", null, "{\"mfa\": false}"], ["135", "2026-10-21 06:55:36.940876+00", "1", "admin.login", null, "{\"mfa\": false}"], ["136", "2026-10-21 07:05:11.464223+00", "7", "admin.login", null, "{\"mfa\": false}"], ["137", "2026-10-21 07:06:12.068381+00", "7", "admin.login", null, "{\"mfa\": false}"], ["138", "2026-10-21 07:06:39.272118+00", "7", "admin.login", null, "{\"mfa\": false}"], ["139", "2026-10-21 08:19:39.566057+00", null, "admin.update", null, "{\"by\": \"changed in the database on request\", \"email\": \"anish@gmail.com\", \"login_id\": \"anish\"}"], ["140", "2026-10-21 08:19:57.321599+00", "7", "admin.login", null, "{\"mfa\": false}"], ["141", "2026-10-21 08:21:06.267395+00", "7", "admin.login", null, "{\"mfa\": false}"], ["142", "2026-10-21 10:48:31.543025+00", "7", "admin.login", null, "{\"mfa\": false}"], ["143", "2026-10-21 10:50:53.561257+00", "7", "client.create", "Cust_00202", "{}"], ["144", "2026-10-21 11:15:56.776699+00", "7", "client.create", "Cust_00206", "{}"], ["145", "2026-10-21 11:17:25.557251+00", "7", "admin.login", null, "{\"mfa\": false}"], ["146", "2026-10-21 11:17:48.550556+00", "7", "admin.login", null, "{\"mfa\": false}"], ["147", "2026-10-21 11:20:01.540013+00", "7", "admin.login", null, "{\"mfa\": false}"], ["148", "2026-10-21 11:20:03.337526+00", "7", "client.validate", "Cust_00206", "{\"valid\": true, \"errors\": 0}"], ["149", "2026-10-21 11:20:04.43366+00", "7", "client.validate", "Cust_00202", "{\"valid\": false, \"errors\": 3}"], ["150", "2026-10-21 11:49:22.19867+00", "7", "admin.login", null, "{\"mfa\": false}"], ["151", "2026-10-21 11:55:01.652254+00", "7", "admin.login", null, "{\"mfa\": false}"], ["152", "2026-10-21 11:56:07.701084+00", "7", "build.start", "Cust_00206", "{\"version\": 1, \"build_id\": \"10\", \"build_type\": \"full\", \"based_on_build\": null}"], ["153", "2026-10-21 11:56:16.552336+00", "7", "build.success", "Cust_00206", "{\"version\": 1, \"build_id\": \"10\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00206-v1\", \"build_type\": \"full\"}"], ["154", "2026-10-21 11:56:32.268199+00", "7", "build.credentials", "Cust_00206", "{\"given\": true, \"build_id\": \"10\"}"], ["155", "2026-10-21 11:58:27.726327+00", "7", "build.credentials", "Cust_00206", "{\"given\": false, \"build_id\": \"10\"}"], ["156", "2026-10-21 12:38:18.813059+00", "7", "admin.login", null, "{\"mfa\": false}"], ["157", "2026-10-21 13:15:54.704232+00", "7", "admin.login", null, "{\"mfa\": false}"], ["158", "2026-10-21 13:49:43.267513+00", "7", "admin.login", null, "{\"mfa\": false}"], ["159", "2026-10-21 13:52:09.426715+00", "7", "admin.login", null, "{\"mfa\": false}"], ["160", "2026-10-21 14:01:05.247569+00", "7", "admin.login", null, "{\"mfa\": false}"], ["161", "2026-10-21 14:19:39.017983+00", "7", "admin.login", null, "{\"mfa\": false}"], ["162", "2026-10-21 14:27:26.234337+00", "7", "client.create", "Cust_00210", "{}"], ["163", "2026-10-21 14:31:25.835873+00", "7", "client.update", "Cust_00210", "{}"], ["164", "2026-10-21 14:38:20.746753+00", "7", "client.update", "Cust_00210", "{}"], ["165", "2026-10-21 14:40:34.110102+00", "7", "client.update", "Cust_00210", "{}"], ["166", "2026-10-21 14:40:36.811824+00", "7", "client.update", "Cust_00210", "{}"], ["167", "2026-10-21 14:40:37.731002+00", "7", "client.validate", "Cust_00210", "{\"valid\": true, \"errors\": 0}"], ["168", "2026-10-21 14:41:06.093345+00", "7", "build.start", "Cust_00210", "{\"version\": 1, \"build_id\": \"11\", \"build_type\": \"full\", \"based_on_build\": null}"], ["169", "2026-10-21 14:41:34.067895+00", "7", "build.success", "Cust_00210", "{\"version\": 1, \"build_id\": \"11\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00210-v1\", \"build_type\": \"full\"}"], ["170", "2026-10-21 14:41:40.971603+00", "7", "build.credentials", "Cust_00210", "{\"given\": true, \"build_id\": \"11\"}"], ["171", "2026-10-21 16:07:30.497649+00", "7", "admin.login", null, "{\"mfa\": false}"], ["172", "2026-10-21 16:16:44.561983+00", "7", "client.create", "Cust_00215", "{}"], ["173", "2026-10-21 16:16:46.88311+00", "7", "client.update", "Cust_00215", "{}"], ["174", "2026-10-21 16:16:47.419755+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 16}"], ["175", "2026-10-21 16:44:38.71545+00", "7", "client.update", "Cust_00215", "{}"], ["176", "2026-10-21 16:44:39.390634+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 4}"], ["177", "2026-10-21 16:45:05.484354+00", "7", "client.update", "Cust_00215", "{}"], ["178", "2026-10-21 16:45:05.877659+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 3}"], ["179", "2026-10-21 16:45:26.07974+00", "7", "client.update", "Cust_00215", "{}"], ["180", "2026-10-21 16:45:26.408902+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 3}"], ["181", "2026-10-21 16:45:28.704728+00", "7", "client.update", "Cust_00215", "{}"], ["182", "2026-10-21 16:45:29.050164+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 3}"], ["183", "2026-10-21 16:45:57.341078+00", "7", "client.update", "Cust_00215", "{}"], ["184", "2026-10-21 16:45:57.670717+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 2}"], ["185", "2026-10-21 16:46:12.854492+00", "7", "client.update", "Cust_00215", "{}"], ["186", "2026-10-21 16:46:13.185618+00", "7", "client.validate", "Cust_00215", "{\"valid\": false, \"errors\": 1}"], ["187", "2026-10-21 16:46:48.132986+00", "7", "client.update", "Cust_00215", "{}"], ["188", "2026-10-21 16:46:48.437053+00", "7", "client.validate", "Cust_00215", "{\"valid\": true, \"errors\": 0}"], ["189", "2026-10-21 16:47:26.237355+00", "7", "build.start", "Cust_00215", "{\"version\": 1, \"build_id\": \"12\", \"build_type\": \"full\", \"based_on_build\": null}"], ["190", "2026-10-21 16:47:35.866685+00", "7", "build.success", "Cust_00215", "{\"version\": 1, \"build_id\": \"12\", \"image_tag\": \"cybertrustworks/vciso-platform:cust_00215-v1\", \"build_type\": \"full\"}"], ["191", "2026-10-21 16:48:18.655982+00", "7", "build.download", "Cust_00215", "{\"file\": \"001_client_init.sql\", \"build_id\": \"12\"}"], ["192", "2026-10-21 18:14:35.330169+00", "7", "admin.login", null, "{\"mfa\": false}"], ["193", "2026-10-21 18:15:55.130212+00", "7", "admin.login", null, "{\"mfa\": false}"]]}, "ctw_build": {"columns": ["build_id", "customer_id", "version", "build_type", "based_on_build", "status", "instance_id", "licence_seal", "image_tag", "image_size_bytes", "artifact_dir", "spec_snapshot", "log", "error", "requested_by", "created_at", "started_at", "finished_at", "files_removed_at"], "rows": [["2", "Cust_00101", "1", "full", null, "success", "91cf2820-2e7d-4521-8f0c-22b19d33974f", "577d04176afe943249794bf4ed0b9c2587065d8920b4fe1becea9e65077d804e", "cybertrustworks/vciso-platform:cust_00101-v1", "63914904", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v1", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 1200000, \"financial_year\": 2026, \"customer_ref_po\": \"PO_ACME_2026_09\", \"contract_end_date\": \"2027-03-31\", \"contract_start_date\": \"2026-04-01\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}, {\"enabled\": true, \"tool_name\": \"Greenbone\", \"target_endpoint\": \"https://scanner.internal.acmefinance.com:9390\", \"pull_frequency_per_day\": 1}]}, \"organization\": {\"offices\": [{\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00101_001\", \"office_type\": \"Primary\", \"office_address\": \"Tower 4, Bandra Kurla Complex\"}, {\"city\": \"London\", \"state\": \"Greater London\", \"country\": \"United Kingdom\", \"pincode\": \"EC2M 5TN\", \"office_id\": \"Cust_00101_002\", \"office_type\": \"Secondary\", \"office_address\": \"77 London Wall\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0001\", \"department\": \"Executive Board\", \"designation\": \"Chief Technology & Risk Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"v.malhotra@acmefinance.com\", \"contact_phone\": \"+91-98200-11223\", \"contact_person\": \"Vikram Malhotra\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0002\", \"department\": \"Information Security\", \"designation\": \"Head of Information Security / vCISO\", \"contact_type\": \"Primary vCISO\", \"contact_email\": \"priya.sharma@acmefinance.com\", \"contact_phone\": \"+91-98200-33445\", \"contact_person\": \"Priya Sharma\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0003\", \"department\": \"IT Operations\", \"designation\": \"Security Operations Lead\", \"contact_type\": \"Escalation\", \"contact_email\": \"rohan.gupta@acmefinance.com\", \"contact_phone\": \"+91-98200-55667\", \"contact_person\": \"Rohan Gupta\", \"contact_priority\": 2}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00101\", \"customer_name\": \"Acme Financial Services International Ltd.\", \"primary_domain\": \"acmefinance.com\", \"deployment_fqdn\": \"vciso.acmefinance.com\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"priya.sharma\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"vCISO\", \"user_name\": \"Priya Sharma\", \"department\": \"Information Security\", \"user_email\": \"priya.sharma@acmefinance.com\", \"designation\": \"vCISO\", \"user_mobile\": \"+91-98200-33445\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikram.malhotra\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Vikram Malhotra\", \"department\": \"Executive Board\", \"user_email\": \"v.malhotra@acmefinance.com\", \"designation\": \"CTO & Risk Officer\", \"user_mobile\": \"+91-98200-11223\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"mobile_access\", \"news_breach_watch\", \"incidents\"], \"licensing_limits\": {\"valid_to\": \"2027-03-31\", \"max_users\": 25, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 20, \"max_api_integrations\": 10}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": true, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"Fintech leak\", \"Acme core banking\"], \"monitored_names\": [\"Acme Financial\", \"Acme Financial Services\", \"Acme International Bank\"], \"monitored_cities\": [\"Mumbai\", \"London\", \"Bengaluru\"], \"monitored_domains\": [\"acmefinance.com\", \"acmebank.co.in\", \"secure.acmefinance.com\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00101_001\", \"Cust_00101_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00101_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v1 of Cust_00101 (build 2), image cybertrustworks/vciso-platform:cust_00101-v1\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for: Acme Financial Services International Ltd.\n     Customer ID: Cust_00101\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed 577d04176afe9432...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00101v1bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'incidents', 'mobile_access', 'news_breach_watch', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v1bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v1bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v1bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v1bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n   done in 0.4s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 1.2s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [builder 2/8] WORKDIR /app\n   #6 CACHED\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #8 CACHED\n   \n   #9 [context instance] load from client\n   #9 transferring instance: 606B 0.0s done\n   #9 DONE 0.0s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.0s\n   \n   #11 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["3", "Cust_00101", "2", "full", null, "success", "82bb6989-6050-4c86-affe-533961a7df8c", "577d04176afe943249794bf4ed0b9c2587065d8920b4fe1becea9e65077d804e", "cybertrustworks/vciso-platform:cust_00101-v2", "63914619", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v2", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 1200000, \"financial_year\": 2026, \"customer_ref_po\": \"PO_ACME_2026_09\", \"contract_end_date\": \"2027-03-31\", \"contract_start_date\": \"2026-04-01\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}, {\"enabled\": true, \"tool_name\": \"Greenbone\", \"target_endpoint\": \"https://scanner.internal.acmefinance.com:9390\", \"pull_frequency_per_day\": 1}]}, \"organization\": {\"offices\": [{\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00101_001\", \"office_type\": \"Primary\", \"office_address\": \"Tower 4, Bandra Kurla Complex\"}, {\"city\": \"London\", \"state\": \"Greater London\", \"country\": \"United Kingdom\", \"pincode\": \"EC2M 5TN\", \"office_id\": \"Cust_00101_002\", \"office_type\": \"Secondary\", \"office_address\": \"77 London Wall\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0001\", \"department\": \"Executive Board\", \"designation\": \"Chief Technology & Risk Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"v.malhotra@acmefinance.com\", \"contact_phone\": \"+91-98200-11223\", \"contact_person\": \"Vikram Malhotra\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0002\", \"department\": \"Information Security\", \"designation\": \"Head of Information Security / vCISO\", \"contact_type\": \"Primary vCISO\", \"contact_email\": \"priya.sharma@acmefinance.com\", \"contact_phone\": \"+91-98200-33445\", \"contact_person\": \"Priya Sharma\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0003\", \"department\": \"IT Operations\", \"designation\": \"Security Operations Lead\", \"contact_type\": \"Escalation\", \"contact_email\": \"rohan.gupta@acmefinance.com\", \"contact_phone\": \"+91-98200-55667\", \"contact_person\": \"Rohan Gupta\", \"contact_priority\": 2}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00101\", \"customer_name\": \"Acme Financial Services International Ltd.\", \"primary_domain\": \"acmefinance.com\", \"deployment_fqdn\": \"vciso.acmefinance.com\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"priya.sharma\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"vCISO\", \"user_name\": \"Priya Sharma\", \"department\": \"Information Security\", \"user_email\": \"priya.sharma@acmefinance.com\", \"designation\": \"vCISO\", \"user_mobile\": \"+91-98200-33445\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikram.malhotra\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Vikram Malhotra\", \"department\": \"Executive Board\", \"user_email\": \"v.malhotra@acmefinance.com\", \"designation\": \"CTO & Risk Officer\", \"user_mobile\": \"+91-98200-11223\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"mobile_access\", \"news_breach_watch\", \"incidents\"], \"licensing_limits\": {\"valid_to\": \"2027-03-31\", \"max_users\": 25, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 20, \"max_api_integrations\": 10}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": true, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"Fintech leak\", \"Acme core banking\"], \"monitored_names\": [\"Acme Financial\", \"Acme Financial Services\", \"Acme International Bank\"], \"monitored_cities\": [\"Mumbai\", \"London\", \"Bengaluru\"], \"monitored_domains\": [\"acmefinance.com\", \"acmebank.co.in\", \"secure.acmefinance.com\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00101_001\", \"Cust_00101_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00101_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v2 of Cust_00101 (build 3), image cybertrustworks/vciso-platform:cust_00101-v2\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for: Acme Financial Services International Ltd.\n     Customer ID: Cust_00101\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed 577d04176afe9432...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00101v2bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'incidents', 'mobile_access', 'news_breach_watch', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v2bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v2bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v2bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v2bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n   done in 0.5s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 0.9s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [builder 2/8] WORKDIR /app\n   #6 CACHED\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #8 CACHED\n   \n   #9 [context instance] load from client\n   #9 transferring instance: 606B 0.0s done\n   #9 DONE 0.0s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.0s\n   \n   #11 [production 2/8] RUN apk add --no-cache tini && mkdir -p /data/evidence /app/instance && chown -R node:node /data\n   #11 ...\n   \n   #12 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["6", "Cust_00101", "3", "image_only", "3", "success", "82bb6989-6050-4c86-affe-533961a7df8c", "577d04176afe943249794bf4ed0b9c2587065d8920b4fe1becea9e65077d804e", "cybertrustworks/vciso-platform:cust_00101-v3", "63914697", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v3", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 1200000, \"financial_year\": 2026, \"customer_ref_po\": \"PO_ACME_2026_09\", \"contract_end_date\": \"2027-03-31\", \"contract_start_date\": \"2026-04-01\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}, {\"enabled\": true, \"tool_name\": \"Greenbone\", \"target_endpoint\": \"https://scanner.internal.acmefinance.com:9390\", \"pull_frequency_per_day\": 1}]}, \"organization\": {\"offices\": [{\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00101_001\", \"office_type\": \"Primary\", \"office_address\": \"Tower 4, Bandra Kurla Complex\"}, {\"city\": \"London\", \"state\": \"Greater London\", \"country\": \"United Kingdom\", \"pincode\": \"EC2M 5TN\", \"office_id\": \"Cust_00101_002\", \"office_type\": \"Secondary\", \"office_address\": \"77 London Wall\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0001\", \"department\": \"Executive Board\", \"designation\": \"Chief Technology & Risk Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"v.malhotra@acmefinance.com\", \"contact_phone\": \"+91-98200-11223\", \"contact_person\": \"Vikram Malhotra\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0002\", \"department\": \"Information Security\", \"designation\": \"Head of Information Security / vCISO\", \"contact_type\": \"Primary vCISO\", \"contact_email\": \"priya.sharma@acmefinance.com\", \"contact_phone\": \"+91-98200-33445\", \"contact_person\": \"Priya Sharma\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0003\", \"department\": \"IT Operations\", \"designation\": \"Security Operations Lead\", \"contact_type\": \"Escalation\", \"contact_email\": \"rohan.gupta@acmefinance.com\", \"contact_phone\": \"+91-98200-55667\", \"contact_person\": \"Rohan Gupta\", \"contact_priority\": 2}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00101\", \"customer_name\": \"Acme Financial Services International Ltd.\", \"primary_domain\": \"acmefinance.com\", \"deployment_fqdn\": \"vciso.acmefinance.com\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"priya.sharma\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"vCISO\", \"user_name\": \"Priya Sharma\", \"department\": \"Information Security\", \"user_email\": \"priya.sharma@acmefinance.com\", \"designation\": \"vCISO\", \"user_mobile\": \"+91-98200-33445\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikram.malhotra\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Vikram Malhotra\", \"department\": \"Executive Board\", \"user_email\": \"v.malhotra@acmefinance.com\", \"designation\": \"CTO & Risk Officer\", \"user_mobile\": \"+91-98200-11223\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"mobile_access\", \"news_breach_watch\", \"incidents\"], \"licensing_limits\": {\"valid_to\": \"2027-03-31\", \"max_users\": 25, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 20, \"max_api_integrations\": 10}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": true, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"Fintech leak\", \"Acme core banking\"], \"monitored_names\": [\"Acme Financial\", \"Acme Financial Services\", \"Acme International Bank\"], \"monitored_cities\": [\"Mumbai\", \"London\", \"Bengaluru\"], \"monitored_domains\": [\"acmefinance.com\", \"acmebank.co.in\", \"secure.acmefinance.com\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00101_001\", \"Cust_00101_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00101_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v3 of Cust_00101 (build 6, image_only), image cybertrustworks/vciso-platform:cust_00101-v3\n\n== 1/3 Instance of the base build\n   instance 82bb6989-6050-4c86-affe-533961a7df8c from v2; the client's database is kept\n   note: not in this update (needs a full build): organisation, offices and contacts\n   note: not in this update (needs a full build): contract\n   note: not in this update (needs a full build): licence limits\n   note: not in this update (needs a full build): frameworks and their offices\n   note: not in this update (needs a full build): tool integrations\n   note: not in this update (needs a full build): news watch profile\n   note: not in this update (needs a full build): initial users\n   done in 0.0s\n\n== 2/3 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 1.2s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [builder 2/8] WORKDIR /app\n   #6 CACHED\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [context instance] load from client\n   #8 transferring instance: 35B done\n   #8 DONE 0.0s\n   \n   #9 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #9 CACHED\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 CACHED\n   \n   #11 [builder 4/8] RUN npm ci\n   #11 CACHED\n   \n   #12 [builder 7/8] COPY --from=identity /instance/modules /tmp/modules\n   #12 CACHED\n   \n   #13 [builder 5/8] COPY src ./src\n   #13 CACHED\n   \n   #14 [builder 6/8] COPY scripts/build.js ./scripts/build.js\n   #14 CACHED\n   \n   #15 [builder 8/8] RUN ENABLED_MODULES=\"$(cat /tmp/modules)\" OBFUSCATE=\"true\" npm run build\n   #15 CACHED\n   \n   #16 [ui 2/6] WORKDIR /ui\n   #16 CACHED\n   \n   #17 [ui 3/6] COPY vciso-platform/vciso-app/package*.json ./\n   #17 CACHED\n   \n   #18 [ui 5/6] COPY vciso-platform/vciso-app/ ./\n   #18 CACHED\n   \n   #19 [ui 4/6] RUN npm ci\n   #19 CACHED\n   \n   #20 [ui 6/6] RUN npm run build\n   #20 CACHED\n   \n   #21 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["8", "Cust_00101", "5", "image_only", "7", "success", "65cdf08b-115a-49cc-9f06-66ea535c1111", "577d04176afe943249794bf4ed0b9c2587065d8920b4fe1becea9e65077d804e", "cybertrustworks/vciso-platform:cust_00101-v5", "63914465", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v5", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 1200000, \"financial_year\": 2026, \"customer_ref_po\": \"PO_ACME_2026_09\", \"contract_end_date\": \"2027-03-31\", \"contract_start_date\": \"2026-04-01\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}, {\"enabled\": true, \"tool_name\": \"Greenbone\", \"target_endpoint\": \"https://scanner.internal.acmefinance.com:9390\", \"pull_frequency_per_day\": 1}]}, \"organization\": {\"offices\": [{\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00101_001\", \"office_type\": \"Primary\", \"office_address\": \"Tower 4, Bandra Kurla Complex\"}, {\"city\": \"London\", \"state\": \"Greater London\", \"country\": \"United Kingdom\", \"pincode\": \"EC2M 5TN\", \"office_id\": \"Cust_00101_002\", \"office_type\": \"Secondary\", \"office_address\": \"77 London Wall\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0001\", \"department\": \"Executive Board\", \"designation\": \"Chief Technology & Risk Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"v.malhotra@acmefinance.com\", \"contact_phone\": \"+91-98200-11223\", \"contact_person\": \"Vikram Malhotra\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0002\", \"department\": \"Information Security\", \"designation\": \"Head of Information Security / vCISO\", \"contact_type\": \"Primary vCISO\", \"contact_email\": \"priya.sharma@acmefinance.com\", \"contact_phone\": \"+91-98200-33445\", \"contact_person\": \"Priya Sharma\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0003\", \"department\": \"IT Operations\", \"designation\": \"Security Operations Lead\", \"contact_type\": \"Escalation\", \"contact_email\": \"rohan.gupta@acmefinance.com\", \"contact_phone\": \"+91-98200-55667\", \"contact_person\": \"Rohan Gupta\", \"contact_priority\": 2}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00101\", \"customer_name\": \"Acme Financial Services International Ltd.\", \"primary_domain\": \"acmefinance.com\", \"deployment_fqdn\": \"vciso.acmefinance.com\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"priya.sharma\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"vCISO\", \"user_name\": \"Priya Sharma\", \"department\": \"Information Security\", \"user_email\": \"priya.sharma@acmefinance.com\", \"designation\": \"vCISO\", \"user_mobile\": \"+91-98200-33445\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikram.malhotra\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Vikram Malhotra\", \"department\": \"Executive Board\", \"user_email\": \"v.malhotra@acmefinance.com\", \"designation\": \"CTO & Risk Officer\", \"user_mobile\": \"+91-98200-11223\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"mobile_access\", \"news_breach_watch\", \"incidents\"], \"licensing_limits\": {\"valid_to\": \"2027-03-31\", \"max_users\": 25, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 20, \"max_api_integrations\": 10}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": true, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"Fintech leak\", \"Acme core banking\"], \"monitored_names\": [\"Acme Financial\", \"Acme Financial Services\", \"Acme International Bank\"], \"monitored_cities\": [\"Mumbai\", \"London\", \"Bengaluru\"], \"monitored_domains\": [\"acmefinance.com\", \"acmebank.co.in\", \"secure.acmefinance.com\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00101_001\", \"Cust_00101_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00101_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v5 of Cust_00101 (build 8, image_only), image cybertrustworks/vciso-platform:cust_00101-v5\n\n== 1/3 Instance of the base build\n   instance 65cdf08b-115a-49cc-9f06-66ea535c1111 from v4; the client's database is kept\n   done in 0.0s\n\n== 2/3 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 0.4s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [context instance] load from client\n   #6 transferring instance: 35B done\n   #6 DONE 0.0s\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [builder 2/8] WORKDIR /app\n   #8 CACHED\n   \n   #9 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #9 CACHED\n   \n   #10 [builder 7/8] COPY --from=identity /instance/modules /tmp/modules\n   #10 CACHED\n   \n   #11 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #11 CACHED\n   \n   #12 [builder 6/8] COPY scripts/build.js ./scripts/build.js\n   #12 CACHED\n   \n   #13 [builder 4/8] RUN npm ci\n   #13 CACHED\n   \n   #14 [builder 5/8] COPY src ./src\n   #14 CACHED\n   \n   #15 [builder 8/8] RUN ENABLED_MODULES=\"$(cat /tmp/modules)\" OBFUSCATE=\"true\" npm run build\n   #15 CACHED\n   \n   #16 [ui 5/6] COPY vciso-platform/vciso-app/ ./\n   #16 CACHED\n   \n   #17 [ui 3/6] COPY vciso-platform/vciso-app/package*.json ./\n   #17 CACHED\n   \n   #18 [ui 4/6] RUN npm ci\n   #18 CACHED\n   \n   #19 [ui 2/6] WORKDIR /ui\n   #19 CACHED\n   \n   #20 [ui 6/6] RUN npm run build\n   #20 CACHED\n   \n   #21 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["7", "Cust_00101", "4", "full", null, "success", "65cdf08b-115a-49cc-9f06-66ea535c1111", "577d04176afe943249794bf4ed0b9c2587065d8920b4fe1becea9e65077d804e", "cybertrustworks/vciso-platform:cust_00101-v4", "63914829", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v4", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 1200000, \"financial_year\": 2026, \"customer_ref_po\": \"PO_ACME_2026_09\", \"contract_end_date\": \"2027-03-31\", \"contract_start_date\": \"2026-04-01\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}, {\"enabled\": true, \"tool_name\": \"Greenbone\", \"target_endpoint\": \"https://scanner.internal.acmefinance.com:9390\", \"pull_frequency_per_day\": 1}]}, \"organization\": {\"offices\": [{\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00101_001\", \"office_type\": \"Primary\", \"office_address\": \"Tower 4, Bandra Kurla Complex\"}, {\"city\": \"London\", \"state\": \"Greater London\", \"country\": \"United Kingdom\", \"pincode\": \"EC2M 5TN\", \"office_id\": \"Cust_00101_002\", \"office_type\": \"Secondary\", \"office_address\": \"77 London Wall\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0001\", \"department\": \"Executive Board\", \"designation\": \"Chief Technology & Risk Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"v.malhotra@acmefinance.com\", \"contact_phone\": \"+91-98200-11223\", \"contact_person\": \"Vikram Malhotra\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0002\", \"department\": \"Information Security\", \"designation\": \"Head of Information Security / vCISO\", \"contact_type\": \"Primary vCISO\", \"contact_email\": \"priya.sharma@acmefinance.com\", \"contact_phone\": \"+91-98200-33445\", \"contact_person\": \"Priya Sharma\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00101_001\", \"contact_id\": \"Cust_00101_001_0003\", \"department\": \"IT Operations\", \"designation\": \"Security Operations Lead\", \"contact_type\": \"Escalation\", \"contact_email\": \"rohan.gupta@acmefinance.com\", \"contact_phone\": \"+91-98200-55667\", \"contact_person\": \"Rohan Gupta\", \"contact_priority\": 2}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00101\", \"customer_name\": \"Acme Financial Services International Ltd.\", \"primary_domain\": \"acmefinance.com\", \"deployment_fqdn\": \"vciso.acmefinance.com\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"priya.sharma\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"vCISO\", \"user_name\": \"Priya Sharma\", \"department\": \"Information Security\", \"user_email\": \"priya.sharma@acmefinance.com\", \"designation\": \"vCISO\", \"user_mobile\": \"+91-98200-33445\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikram.malhotra\", \"office_id\": \"Cust_00101_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Vikram Malhotra\", \"department\": \"Executive Board\", \"user_email\": \"v.malhotra@acmefinance.com\", \"designation\": \"CTO & Risk Officer\", \"user_mobile\": \"+91-98200-11223\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"mobile_access\", \"news_breach_watch\", \"incidents\"], \"licensing_limits\": {\"valid_to\": \"2027-03-31\", \"max_users\": 25, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 20, \"max_api_integrations\": 10}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": true, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"Fintech leak\", \"Acme core banking\"], \"monitored_names\": [\"Acme Financial\", \"Acme Financial Services\", \"Acme International Bank\"], \"monitored_cities\": [\"Mumbai\", \"London\", \"Bengaluru\"], \"monitored_domains\": [\"acmefinance.com\", \"acmebank.co.in\", \"secure.acmefinance.com\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00101_001\", \"Cust_00101_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00101_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v4 of Cust_00101 (build 7, full), image cybertrustworks/vciso-platform:cust_00101-v4\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for: Acme Financial Services International Ltd.\n     Customer ID: Cust_00101\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed 577d04176afe9432...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00101v4bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'incidents', 'mobile_access', 'news_breach_watch', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v4bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v4bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v4bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00101v4bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   note: Integration 'Greenbone' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n   done in 0.7s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 0.9s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [builder 2/8] WORKDIR /app\n   #6 CACHED\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #8 CACHED\n   \n   #9 [context instance] load from client\n   #9 transferring instance: 606B 0.0s done\n   #9 DONE 0.0s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.0s\n   \n   #11 [production 2/8] RUN apk add --no-cache tini && mkdir -p /data/evidence /app/instance && chown -R node:node /data\n   #11 ...\n   \n   #12 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["12", "Cust_00215", "1", "full", null, "success", "70d69e5b-8322-4a8f-97fc-d08d21a26bc1", "ad714054188d849c774c7ee8cf4accf816b707457417ee403a7c719f82da4d84", "cybertrustworks/vciso-platform:cust_00215-v1", "63951745", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00215v1", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 3000, \"financial_year\": 2026, \"customer_ref_po\": \"kaouc834672\", \"contract_end_date\": \"2027-11-15\", \"contract_start_date\": \"2026-10-21\", \"invoicing_frequency\": \"Q\", \"contract_period_months\": 13}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \"http://atdshjdc.com\", \"pull_frequency_per_day\": 1}, {\"enabled\": true, \"tool_name\": \"Qualys\", \"target_endpoint\": \"https://haeyu.com\", \"pull_frequency_per_day\": 4}]}, \"organization\": {\"offices\": [{\"city\": \" Mumbai\", \"state\": \" Maharashtra\", \"country\": \" India\", \"pincode\": \"400051\", \"office_id\": \"Cust_00215_001\", \"office_type\": \"Primary\", \"office_address\": \" 3rd Floor, One BKC, Bandra Kurla Complex\"}, {\"city\": \" Navi Mumbai\", \"state\": \" Maharashtra\", \"country\": \"India\", \"pincode\": \"400710\", \"office_id\": \"Cust_00215_002\", \"office_type\": \"Data Center\", \"office_address\": \"Plot 7, TTC Industrial Area, Mahape\"}], \"category\": \"Financial Institution\", \"contacts\": [{\"office_id\": \"Cust_00215_001\", \"contact_id\": \"Cust_00215_001_0001\", \"department\": \"dferc dfcv\", \"designation\": \"saeuh \", \"contact_type\": \"Executive\", \"contact_email\": \"anishku@gmail.com\", \"contact_phone\": \"98765432105\", \"contact_person\": \"anman\", \"contact_priority\": 1}], \"industry\": \"Banking & Financial Services\", \"customer_id\": \"Cust_00215\", \"customer_name\": \" Orion FinServ Pvt Ltd\", \"primary_domain\": \" orionfinserv.in\", \"deployment_fqdn\": \" \"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"akfdau@gmail\", \"office_id\": \"Cust_00215_001\", \"role_type\": \"vCISO\", \"user_name\": \"aofh nmcv\", \"department\": \"rtgf vghterh\", \"user_email\": \"anduha@gmail.com\", \"designation\": \"qfqcqfcf\", \"user_mobile\": \"9764523352\"}, {\"user_id\": \"User_0002\", \"login_id\": \"qfqfregrqqdc@gamil.com\", \"office_id\": \"Cust_00215_001\", \"role_type\": \"vCISO\", \"user_name\": \"qfre4dc ef\", \"department\": \" erfrecva\", \"user_email\": \"dvagahs@gamil.com\", \"designation\": \"werfgqv\", \"user_mobile\": \"efc erwf\"}, {\"user_id\": \"User_0003\", \"login_id\": \"fcuasgd@gmail.com\", \"office_id\": \"Cust_00215_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"aokhuwref\", \"department\": \"rqgft ghvb\", \"user_email\": \"asdfca@gamil.com\", \"designation\": \"aewf vce\", \"user_mobile\": \"987654323\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\"], \"licensing_limits\": {\"valid_to\": \"2026-10-22\", \"max_users\": 20, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 4, \"max_api_integrations\": 2}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": false, \"password_expiry_days\": 2, \"session_timeout_minutes\": 115}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00215_001\", \"Cust_00215_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00215_002\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v1 of Cust_00215 (build 12, full), image cybertrustworks/vciso-platform:cust_00215-v1\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for:  Orion FinServ Pvt Ltd\n     Customer ID: Cust_00215\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed ad714054188d849c...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00215v1bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     note: Integration 'Qualys' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00215v1bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00215v1bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00215v1bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00215v1bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   note: Integration 'Qualys' is not in the Tool-API-Map sheet; no API catalogue seeded for it\n   done in 0.7s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 1.4s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d\n   #5 resolve docker.io/library/node:24-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d 0.0s done\n   #5 CACHED\n   \n   #6 [builder 3/8] COPY package*.json ./\n   #6 CACHED\n   \n   #7 [builder 2/8] WORKDIR /app\n   #7 CACHED\n   \n   #8 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #8 CACHED\n   \n   #9 [context instance] load from client\n   #9 transferring instance: 520B 0.0s done\n   #9 DONE 0.0s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.1s\n   \n   #11 [production 2/8] RUN apk add --no-cache tini && mkdir -p /data/evidence /app/instance && chown -R node:node /data\n   #11 ...\n   \n   #12 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["10", "Cust_00206", "1", "full", null, "success", "3ec5ae5e-3b8f-44df-8257-5aaead4fd173", "ed6817848199885b76ffb238f86eed47feded3b46de5e5ecfb29cb45abc12b9b", "cybertrustworks/vciso-platform:cust_00206-v1", "63914474", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00206v1", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 900000, \"financial_year\": 2026, \"customer_ref_po\": \" PO-GLX-2026-01\", \"contract_end_date\": \"2027-10-20\", \"contract_start_date\": \"2026-10-21\", \"invoicing_frequency\": \"M\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \" https://cloud.tenable.com,\", \"pull_frequency_per_day\": 2}]}, \"organization\": {\"offices\": [{\"city\": \"Bengaluru\", \"state\": \"Karnataka\", \"country\": \"India\", \"pincode\": \" 560001\", \"office_id\": \"Cust_00206_001\", \"office_type\": \"Primary\", \"office_address\": \"\u2502 4th Floor, Prestige Tower, MG Road\"}, {\"city\": \"Pune\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"411057\", \"office_id\": \"Cust_00206_002\", \"office_type\": \"Secondary\", \"office_address\": \"Plot 22, Hinjewadi Phase\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00206_001\", \"contact_id\": \"Cust_00206_001_0001\", \"department\": \"\", \"designation\": \" Chief Executive Officer\", \"contact_type\": \"Executive\", \"contact_email\": \"rahul.mehta@globexhealth.in\", \"contact_phone\": \"+91-98450-11111\", \"contact_person\": \" Rahul\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00206_001\", \"contact_id\": \"Cust_00206_001_0002\", \"department\": \"\", \"designation\": \"Head of Information Security\", \"contact_type\": \"Executive\", \"contact_email\": \"anish@globexhealth.in\", \"contact_phone\": \"+91-98450-22222\", \"contact_person\": \"Anish\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00206_001\", \"contact_id\": \"Cust_00206_001_0003\", \"department\": \"\", \"designation\": \"IT Operations Lead\", \"contact_type\": \"Executive\", \"contact_email\": \"sneha.k@globexhealth.in\", \"contact_phone\": \"+91-98450-33333\", \"contact_person\": \"Sneha  Kulkarni\", \"contact_priority\": 1}], \"industry\": \" Healthcare\", \"customer_id\": \"Cust_00206\", \"customer_name\": \"Globex Health Pvt Ltd\", \"primary_domain\": \" globexhealth.in\", \"deployment_fqdn\": \"vciso.globexhealth.in\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"anish.globex\", \"office_id\": \"Cust_00206_001\", \"role_type\": \"vCISO\", \"user_name\": \" Anish \", \"department\": \"\", \"user_email\": \"anish@globexhealth.in\", \"designation\": \"\", \"user_mobile\": \"\"}, {\"user_id\": \"User_0002\", \"login_id\": \"rahul.mehta\", \"office_id\": \"Cust_00206_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \"Rahul Mehta\", \"department\": \"\", \"user_email\": \"rahul.mehta@globexhealth.in\", \"designation\": \"\", \"user_mobile\": \"\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"news_breach_watch\"], \"licensing_limits\": {\"valid_to\": \"2027-10-20\", \"max_users\": 20, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 10, \"max_api_integrations\": 5}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": false, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"patient data leak\"], \"monitored_names\": [\"Globex Health\"], \"monitored_cities\": [\"Bengaluru\"], \"monitored_domains\": [\"globexhealth.in\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00206_001\", \"Cust_00206_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00206_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v1 of Cust_00206 (build 10, full), image cybertrustworks/vciso-platform:cust_00206-v1\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for: Globex Health Pvt Ltd\n     Customer ID: Cust_00206\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed ed6817848199885b...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00206v1bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'news_breach_watch', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00206v1bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00206v1bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00206v1bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00206v1bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   done in 1.0s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 1.6s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f\n   #5 resolve docker.io/library/node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f 0.0s done\n   #5 CACHED\n   \n   #6 [builder 2/8] WORKDIR /app\n   #6 CACHED\n   \n   #7 [builder 3/8] COPY package*.json ./\n   #7 CACHED\n   \n   #8 [prod-deps 4/4] RUN npm ci --omit=dev && npm cache clean --force\n   #8 CACHED\n   \n   #9 [context instance] load from client\n   #9 transferring instance: 545B 0.0s done\n   #9 DONE 0.0s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.0s\n   \n   #11 [production 2/8] RUN apk add --no-cache tini && mkdir -p /data/evidence /app/instance && chown -R node:node /data\n   #11 ...\n   \n   #12 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null], ["11", "Cust_00210", "1", "full", null, "success", "e7b3b087-7c94-4761-b611-545723dd49bb", "e6f8aac6df28579fa9d523b66c6f748a36a71cf37447cf175abbd2caf4e5da8b", "cybertrustworks/vciso-platform:cust_00210-v1", "63951140", "C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00210v1", "{\"contract\": {\"currency\": \"INR\", \"contract_id\": \"Contract_001\", \"contract_type\": \"Original\", \"contract_value\": 750000, \"financial_year\": 2026, \"customer_ref_po\": \"PO-NIM-2026-001\", \"contract_end_date\": \"2027-10-21\", \"contract_start_date\": \"2026-10-21\", \"invoicing_frequency\": \"Q\", \"contract_period_months\": 12}, \"integrations\": {\"tools\": [{\"enabled\": true, \"tool_name\": \"Tenable\", \"target_endpoint\": \" https://cloud.tenable.com\", \"pull_frequency_per_day\": 2}]}, \"organization\": {\"offices\": [{\"city\": \"Hyderabad\", \"state\": \"Telangana\", \"country\": \"India\", \"pincode\": \"500081\", \"office_id\": \"Cust_00210_001\", \"office_type\": \"Primary\", \"office_address\": \" 5th Floor, Cyber Towers, Hitech City\"}, {\"city\": \"Mumbai\", \"state\": \"Maharashtra\", \"country\": \"India\", \"pincode\": \"400093\", \"office_id\": \"Cust_00210_002\", \"office_type\": \"Secondary\", \"office_address\": \"Unit 12, MIDC Andheri East\"}], \"category\": \"Enterprise\", \"contacts\": [{\"office_id\": \"Cust_00210_001\", \"contact_id\": \"Cust_00210_001_0001\", \"department\": \"Management\", \"designation\": \"Managing Director\", \"contact_type\": \"Executive\", \"contact_email\": \"vikas.reddy@nimbuslogistics.in\", \"contact_phone\": \"9848010001\", \"contact_person\": \"Vikas Reddy\", \"contact_priority\": 1}, {\"office_id\": \"Cust_00210_002\", \"contact_id\": \"Cust_00210_001_0002\", \"department\": \" IT\", \"designation\": \"IT Operations Head\", \"contact_type\": \"Escalation\", \"contact_email\": \"neha.joshi@nimbuslogistics.in\", \"contact_phone\": \"9820010002\", \"contact_person\": \" Neha Joshi\", \"contact_priority\": 2}], \"industry\": \"Logistics\", \"customer_id\": \"Cust_00210\", \"customer_name\": \"Nimbus Logistics Pvt Ltd\", \"primary_domain\": \"nimbuslogistics.in\", \"deployment_fqdn\": \" vciso.nimbuslogistics.in\"}, \"initial_users\": [{\"user_id\": \"User_0001\", \"login_id\": \"arjun.mehta\", \"office_id\": \"Cust_00210_001\", \"role_type\": \"vCISO\", \"user_name\": \"Arjun Mehta\", \"department\": \"Information Security\", \"user_email\": \"arjun.mehta@nimbuslogistics.in\", \"designation\": \" Head of Information Security\", \"user_mobile\": \"9848020001\"}, {\"user_id\": \"User_0002\", \"login_id\": \"vikas.reddy\", \"office_id\": \"Cust_00210_001\", \"role_type\": \"Organisation Owner\", \"user_name\": \" Vikas Reddy\", \"department\": \"Management\", \"user_email\": \"vikas.reddy@nimbuslogistics.in\", \"designation\": \"Managing Director\", \"user_mobile\": \"9848010001\"}], \"enabled_modules\": [\"compliance\", \"vulnerabilities\", \"alerting\", \"news_breach_watch\"], \"licensing_limits\": {\"valid_to\": \"2027-10-20\", \"max_users\": 20, \"max_vcisos\": 2, \"max_frameworks\": 2, \"max_org_owners\": 1, \"max_control_owners\": 10, \"max_api_integrations\": 5}, \"security_policies\": {\"sso_type\": \"LOCAL\", \"mfa_enforced\": false, \"password_expiry_days\": 90, \"session_timeout_minutes\": 15}, \"news_watch_profile\": {\"custom_keywords\": [\"shipment data leak\"], \"monitored_names\": [\"Nimbus Logistics\"], \"monitored_cities\": [\"Hyderabad\"], \"monitored_domains\": [\"nimbuslogistics.in\"]}, \"selected_frameworks\": [{\"office_ids\": [\"Cust_00210_001\", \"Cust_00210_002\"], \"framework_id\": 102, \"review_frequency_months\": 12}, {\"office_ids\": [\"Cust_00210_001\"], \"framework_id\": 103, \"review_frequency_months\": 6}]}", "Build v1 of Cust_00210 (build 11, full), image cybertrustworks/vciso-platform:cust_00210-v1\n\n== 1/4 Client spec from the CTW database\n   done in 0.0s\n\n== 2/4 Bundle: validate, seal, schema, compose\n   =======================================================\n     CyberTrustWorks Release Builder for: Nimbus Logistics Pvt Ltd\n     Customer ID: Cust_00210\n   =======================================================\n   [1/4] Validating and sealing the intake specification...\n     OK  Specification valid; licence sealed e6f8aac6df28579f...\n   [2/4] Generating tailored database schema & filtered seed...\n   [SUCCESS] ctw-adminbuildsCust_00210v1bundle001_client_init.sql: 25 workbook tables + modules ['alerting', 'compliance', 'news_breach_watch', 'vulnerabilities'], 196 licensed controls, frameworks [102, 103]\n     note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n     note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n     OK  Database schema created: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00210v1bundle001_client_init.sql\n   [3/4] Generating client docker-compose.yml...\n     OK  Client compose manifest written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00210v1bundledocker-compose.yml\n   [4/4] Writing client deployment guide...\n     OK  Client deployment instructions written: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00210v1bundleREADME.md\n   [DONE] Client bundle generated at: C:AnishcompanyAyushtest2vciso-platform-share-2026-10-19vciso-platformctw-adminbuildsCust_00210v1bundle\n     - 001_client_init.sql\n     - README.md\n     - client_spec.json\n     - docker-compose.yml\n     - instance.json\n   note: UI-Report-Dashboard-List: UI_RD_0002 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0003 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0004 appears more than once; first row kept\n   note: UI-Report-Dashboard-List: UI_RD_0005 appears more than once; first row kept\n   done in 0.6s\n\n== 3/4 Docker image\n   #0 building with \"desktop-linux\" instance using docker driver\n   \n   #1 [internal] load build definition from Dockerfile\n   #1 transferring dockerfile: 4.64kB 0.0s done\n   #1 DONE 0.0s\n   \n   #2 [context instance] load .dockerignore\n   #2 transferring instance: 2B done\n   #2 DONE 0.0s\n   \n   #3 [internal] load metadata for docker.io/library/node:24-alpine\n   #3 DONE 2.3s\n   \n   #4 [internal] load build context\n   #4 transferring context: 10.97kB 0.0s done\n   #4 DONE 0.0s\n   \n   #5 [context instance] load from client\n   #5 transferring instance: 548B 0.0s done\n   #5 DONE 0.0s\n   \n   #6 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d\n   #6 resolve docker.io/library/node:24-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d 0.0s done\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 0B / 57.37MB 0.2s\n   #6 sha256:ffd4ace32a62e2f0eb47d6276ea3d131baaf4f1d27ad6b951fb057b5e50665fc 0B / 1.26MB 0.2s\n   #6 sha256:28186c8c3a4726e50fbff6f9b8ecb06a83c72aa645f5253b6fc1fa14bf65bc44 0B / 442B 0.2s\n   #6 sha256:28186c8c3a4726e50fbff6f9b8ecb06a83c72aa645f5253b6fc1fa14bf65bc44 442B / 442B 0.5s done\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 3.15MB / 57.37MB 0.9s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 6.29MB / 57.37MB 1.2s\n   #6 sha256:ffd4ace32a62e2f0eb47d6276ea3d131baaf4f1d27ad6b951fb057b5e50665fc 1.26MB / 1.26MB 1.3s done\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 9.44MB / 57.37MB 1.7s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 12.58MB / 57.37MB 2.3s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 15.73MB / 57.37MB 2.6s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 18.87MB / 57.37MB 3.0s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 23.07MB / 57.37MB 3.5s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 26.21MB / 57.37MB 3.9s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 29.36MB / 57.37MB 4.2s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 33.55MB / 57.37MB 4.7s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 37.75MB / 57.37MB 5.1s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 40.89MB / 57.37MB 5.4s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 45.09MB / 57.37MB 5.9s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 48.23MB / 57.37MB 6.2s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 51.38MB / 57.37MB 7.4s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 54.53MB / 57.37MB 8.3s\n   #6 sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 57.37MB / 57.37MB 8.9s done\n   #6 extracting sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a\n   #6 extracting sha256:1d93122a5ea1bd309bdff36d7f7dbf3706228748bf200163b5a5f0dbad23573a 1.1s done\n   #6 DONE 10.0s\n   \n   #6 [ui 1/6] FROM docker.io/library/node:24-alpine@sha256:6a1c190e17215d844926b0677f4bf87273ff7d5e54db06d3b5b5863ab0b09a3d\n   #6 extracting sha256:ffd4ace32a62e2f0eb47d6276ea3d131baaf4f1d27ad6b951fb057b5e50665fc 0.0s done\n   #6 extracting sha256:28186c8c3a4726e50fbff6f9b8ecb06a83c72aa645f5253b6fc1fa14bf65bc44 0.0s done\n   #6 DONE 10.1s\n   \n   #7 [production 2/8] RUN apk add --no-cache tini && mkdir -p /data/evidence /app/instance && chown -R node:node /data\n   #7 ...\n   \n   #8 [builder 2/8] WORKDIR /app\n   #8 DONE 0.9s\n   \n   #9 [ui 2/6] WORKDIR /ui\n   #9 DONE 0.9s\n   \n   #10 [identity 2/3] COPY --from=instance instance.json /instance/instance.json\n   #10 DONE 0.9s\n   \n   #11 [ui 3/6] COPY vciso-platform/vciso-app/package*.json ./\n   #11 DONE 0.0s\n   \n   #12 [builder 3/8] COPY package*.json ./\n   #12 DONE 0.1s\n   \n   #13 [ui 4/6] RUN npm ci\n   #13 ...\n   \n   #14 [identity 3/3] RUN node -e \"   const i = require('/instance/instance.json'", null, null, null, null, null, null]]}, "ctw_client": {"columns": ["customer_id", "customer_name", "category", "industry", "primary_domain", "deployment_fqdn", "status", "created_by", "created_at", "updated_at"], "rows": [["Cust_00202", "Globex Health Pvt Ltd", "Enterprise", "Healthcare", "globexhealth.in", "vciso.globexhealth.in", "draft", "7", "2026-10-21 10:50:53.561257+00", "2026-10-21 11:20:04.430313+00"], ["Cust_00206", "Globex Health Pvt Ltd", "Enterprise", "Healthcare", "globexhealth.in", "vciso.globexhealth.in", "generated", "7", "2026-10-21 11:15:56.776699+00", "2026-10-21 11:56:16.542139+00"], ["Cust_00210", "Nimbus Logistics Pvt Ltd", "Enterprise", "Logistics", "nimbuslogistics.in", "vciso.nimbuslogistics.in", "generated", "7", "2026-10-21 14:27:26.234337+00", "2026-10-21 14:41:34.062339+00"], ["Cust_00215", "Orion FinServ Pvt Ltd", "Financial Institution", "Banking & Financial Services", "orionfinserv.in", "", "generated", "7", "2026-10-21 16:16:44.561983+00", "2026-10-21 16:47:35.860009+00"], ["Cust_00101", "Acme Financial Services International Ltd.", "Enterprise", "Banking & Financial Services", "acmefinance.com", "vciso.acmefinance.com", "generated", "1", "2026-10-21 04:54:09.922004+00", "2026-10-21 05:41:29.260583+00"]]}, "ctw_client_contact": {"columns": ["contact_id", "customer_id", "office_id", "contact_type", "contact_priority", "contact_person", "designation", "department", "contact_email", "contact_phone"], "rows": [["Cust_00101_001_0001", "Cust_00101", "Cust_00101_001", "Executive", "1", "Vikram Malhotra", "Chief Technology & Risk Officer", "Executive Board", "v.malhotra@acmefinance.com", "+91-98200-11223"], ["Cust_00101_001_0002", "Cust_00101", "Cust_00101_001", "Primary vCISO", "1", "Priya Sharma", "Head of Information Security / vCISO", "Information Security", "priya.sharma@acmefinance.com", "+91-98200-33445"], ["Cust_00101_001_0003", "Cust_00101", "Cust_00101_001", "Escalation", "2", "Rohan Gupta", "Security Operations Lead", "IT Operations", "rohan.gupta@acmefinance.com", "+91-98200-55667"], ["Cust_00206_001_0001", "Cust_00206", "Cust_00206_001", "Executive", "1", "Rahul", "Chief Executive Officer", "", "rahul.mehta@globexhealth.in", "+91-98450-11111"], ["Cust_00206_001_0002", "Cust_00206", "Cust_00206_001", "Executive", "1", "Anish", "Head of Information Security", "", "anish@globexhealth.in", "+91-98450-22222"], ["Cust_00206_001_0003", "Cust_00206", "Cust_00206_001", "Executive", "1", "Sneha  Kulkarni", "IT Operations Lead", "", "sneha.k@globexhealth.in", "+91-98450-33333"], ["Cust_00210_001_0001", "Cust_00210", "Cust_00210_001", "Executive", "1", "Vikas Reddy", "Managing Director", "Management", "vikas.reddy@nimbuslogistics.in", "9848010001"], ["Cust_00210_001_0002", "Cust_00210", "Cust_00210_002", "Escalation", "2", "Neha Joshi", "IT Operations Head", "IT", "neha.joshi@nimbuslogistics.in", "9820010002"], ["Cust_00215_001_0001", "Cust_00215", "Cust_00215_001", "Executive", "1", "anman", "saeuh", "dferc dfcv", "anishku@gmail.com", "98765432105"]]}, "ctw_client_initial_user": {"columns": ["customer_id", "user_id", "login_id", "user_name", "user_email", "user_mobile", "designation", "department", "role_type", "office_id"], "rows": [["Cust_00101", "User_0001", "priya.sharma", "Priya Sharma", "priya.sharma@acmefinance.com", "+91-98200-33445", "vCISO", "Information Security", "vCISO", "Cust_00101_001"], ["Cust_00101", "User_0002", "vikram.malhotra", "Vikram Malhotra", "v.malhotra@acmefinance.com", "+91-98200-11223", "CTO & Risk Officer", "Executive Board", "Organisation Owner", "Cust_00101_001"], ["Cust_00206", "User_0001", "anish.globex", "Anish", "anish@globexhealth.in", "", "", "", "vCISO", "Cust_00206_001"], ["Cust_00206", "User_0002", "rahul.mehta", "Rahul Mehta", "rahul.mehta@globexhealth.in", "", "", "", "Organisation Owner", "Cust_00206_001"], ["Cust_00210", "User_0001", "arjun.mehta", "Arjun Mehta", "arjun.mehta@nimbuslogistics.in", "9848020001", "Head of Information Security", "Information Security", "vCISO", "Cust_00210_001"], ["Cust_00210", "User_0002", "vikas.reddy", "Vikas Reddy", "vikas.reddy@nimbuslogistics.in", "9848010001", "Managing Director", "Management", "Organisation Owner", "Cust_00210_001"], ["Cust_00215", "User_0001", "akfdau@gmail", "aofh nmcv", "anduha@gmail.com", "9764523352", "qfqcqfcf", "rtgf vghterh", "vCISO", "Cust_00215_001"], ["Cust_00215", "User_0002", "qfqfregrqqdc@gamil.com", "qfre4dc ef", "dvagahs@gamil.com", "efc erwf", "werfgqv", "erfrecva", "vCISO", "Cust_00215_001"], ["Cust_00215", "User_0003", "fcuasgd@gmail.com", "aokhuwref", "asdfca@gamil.com", "987654323", "aewf vce", "rqgft ghvb", "Organisation Owner", "Cust_00215_001"]]}, "ctw_client_news_watch": {"columns": ["customer_id", "monitored_names", "monitored_domains", "monitored_cities", "custom_keywords"], "rows": [["Cust_00101", "{\"Acme Financial\",\"Acme Financial Services\",\"Acme International Bank\"}", "{acmefinance.com,acmebank.co.in,secure.acmefinance.com}", "{Mumbai,London,Bengaluru}", "{\"Fintech leak\",\"Acme core banking\"}"], ["Cust_00206", "{\"Globex Health\"}", "{globexhealth.in}", "{Bengaluru}", "{\"patient data leak\"}"], ["Cust_00210", "{\"Nimbus Logistics\"}", "{nimbuslogistics.in}", "{Hyderabad}", "{\"shipment data leak\"}"]]}, "ctw_client_office": {"columns": ["office_id", "customer_id", "office_type", "office_address", "city", "state", "country", "pincode"], "rows": [["Cust_00101_001", "Cust_00101", "Primary", "Tower 4, Bandra Kurla Complex", "Mumbai", "Maharashtra", "India", "400051"], ["Cust_00101_002", "Cust_00101", "Secondary", "77 London Wall", "London", "Greater London", "United Kingdom", "EC2M 5TN"], ["Cust_00206_001", "Cust_00206", "Primary", "\u2502 4th Floor, Prestige Tower, MG Road", "Bengaluru", "Karnataka", "India", "560001"], ["Cust_00206_002", "Cust_00206", "Secondary", "Plot 22, Hinjewadi Phase", "Pune", "Maharashtra", "India", "411057"], ["Cust_00210_001", "Cust_00210", "Primary", "5th Floor, Cyber Towers, Hitech City", "Hyderabad", "Telangana", "India", "500081"], ["Cust_00210_002", "Cust_00210", "Secondary", "Unit 12, MIDC Andheri East", "Mumbai", "Maharashtra", "India", "400093"], ["Cust_00215_001", "Cust_00215", "Primary", "3rd Floor, One BKC, Bandra Kurla Complex", "Mumbai", "Maharashtra", "India", "400051"], ["Cust_00215_002", "Cust_00215", "Data Center", "Plot 7, TTC Industrial Area, Mahape", "Navi Mumbai", "Maharashtra", "India", "400710"]]}, "ctw_client_security_policy": {"columns": ["customer_id", "sso_type", "sso_metadata_url", "mfa_enforced", "password_expiry_days", "session_timeout_minutes"], "rows": [["Cust_00101", "LOCAL", null, "True", "90", "15"], ["Cust_00202", "LOCAL", null, "True", "90", "15"], ["Cust_00206", "LOCAL", null, "False", "90", "15"], ["Cust_00210", "LOCAL", null, "False", "90", "15"], ["Cust_00215", "LOCAL", null, "False", "2", "115"]]}, "ctw_client_tool": {"columns": ["customer_id", "tool_name", "enabled", "target_endpoint", "pull_frequency_per_day", "sort_order"], "rows": [["Cust_00101", "Tenable", "True", "https://cloud.tenable.com", "2", "0"], ["Cust_00101", "Greenbone", "True", "https://scanner.internal.acmefinance.com:9390", "1", "1"], ["Cust_00206", "Tenable", "True", "https://cloud.tenable.com,", "2", "0"], ["Cust_00210", "Tenable", "True", "https://cloud.tenable.com", "2", "0"], ["Cust_00215", "Tenable", "True", "http://atdshjdc.com", "1", "0"], ["Cust_00215", "Qualys", "True", "https://haeyu.com", "4", "1"]]}, "ctw_contract": {"columns": ["customer_id", "contract_id", "customer_ref_po", "contract_type", "financial_year", "contract_period_months", "contract_start_date", "contract_end_date", "contract_value", "currency", "invoicing_frequency", "is_current"], "rows": [["Cust_00101", "Contract_001", "PO_ACME_2026_09", "Original", "2026", "12", "2026-04-01", "2027-03-31", "1200000.00", "INR", "M", "True"], ["Cust_00202", "Contract_001", "", "Original", "2026", "12", "2026-10-21", "2027-10-20", "0.00", "INR", "M", "True"], ["Cust_00206", "Contract_001", "PO-GLX-2026-01", "Original", "2026", "12", "2026-10-21", "2027-10-20", "900000.00", "INR", "M", "True"], ["Cust_00210", "Contract_001", "PO-NIM-2026-001", "Original", "2026", "12", "2026-10-21", "2027-10-21", "750000.00", "INR", "Q", "True"], ["Cust_00215", "Contract_001", "kaouc834672", "Original", "2026", "13", "2026-10-21", "2027-11-15", "3000.00", "INR", "Q", "True"]]}, "ctw_framework": {"columns": ["framework_id", "framework_name", "active"], "rows": [["101", "ISO 9001:2015 (Quality Management System)", "True"], ["102", "ISO/IEC 27001:2022 (Information Security Management System - ISMS)", "True"], ["103", "DPDPA 2023 (Digital Personal Data Protection Act - India)", "True"], ["104", "ISO 22301:2019 (Business Continuity Management System - BCMS)", "True"], ["105", "ISO 31000:2018 (Risk Management Guidelines)", "True"], ["106", "ISO 45001:2018 (Occupational Health and Safety)", "True"], ["107", "NIST SP 800-53 Rev. 5 (Security and Privacy Controls)", "True"], ["108", "NIST Cybersecurity Framework (CSF) 2.0", "True"], ["109", "PCI DSS v4.0 (Payment Card Industry Data Security Standard)", "True"], ["110", "COBIT 2019 (Information & Technology Governance)", "True"], ["111", "TOGAF Standard 10th Ed. (Enterprise Architecture)", "True"], ["112", "ISA/IEC 62443 (Industrial Automation & Control Systems)", "True"], ["113", "IEC 61508 (Functional Safety)", "True"], ["114", "IEC 61511 (Functional Safety - Process Industry)", "True"], ["115", "NERC CIP (Critical Infrastructure Protection)", "True"], ["116", "ISO/IEC 27017:2015 (Cloud Security Controls)", "True"], ["117", "ISO/IEC 27701:2019 (Privacy Information Management System - PIMS)", "True"], ["118", "GDPR (General Data Protection Regulation - EU)", "True"], ["119", "EU AI Act (Artificial Intelligence Governance)", "True"]]}, "ctw_licence": {"columns": ["customer_id", "max_users", "max_vcisos", "max_org_owners", "max_control_owners", "max_api_integrations", "max_frameworks", "valid_to", "updated_at"], "rows": [["Cust_00101", "25", "2", "1", "20", "10", "2", "2027-03-31", "2026-10-21 05:41:28.170743+00"], ["Cust_00202", "25", "2", "1", "20", "5", "2", "2027-10-20", "2026-10-21 10:50:53.561257+00"], ["Cust_00206", "20", "2", "1", "10", "5", "2", "2027-10-20", "2026-10-21 11:15:56.776699+00"], ["Cust_00210", "20", "2", "1", "10", "5", "2", "2027-10-20", "2026-10-21 14:40:36.811824+00"], ["Cust_00215", "20", "2", "1", "4", "2", "2", "2026-10-22", "2026-10-21 16:46:48.132986+00"]]}, "ctw_licence_framework": {"columns": ["customer_id", "framework_id", "review_frequency_months"], "rows": [["Cust_00101", "102", "12"], ["Cust_00101", "103", "6"], ["Cust_00206", "102", "12"], ["Cust_00206", "103", "6"], ["Cust_00210", "102", "12"], ["Cust_00210", "103", "6"], ["Cust_00215", "102", "12"], ["Cust_00215", "103", "6"]]}, "ctw_licence_framework_office": {"columns": ["customer_id", "framework_id", "office_id"], "rows": [["Cust_00101", "102", "Cust_00101_001"], ["Cust_00101", "102", "Cust_00101_002"], ["Cust_00101", "103", "Cust_00101_001"], ["Cust_00206", "102", "Cust_00206_001"], ["Cust_00206", "102", "Cust_00206_002"], ["Cust_00206", "103", "Cust_00206_001"], ["Cust_00210", "102", "Cust_00210_001"], ["Cust_00210", "102", "Cust_00210_002"], ["Cust_00210", "103", "Cust_00210_001"], ["Cust_00215", "102", "Cust_00215_001"], ["Cust_00215", "102", "Cust_00215_002"], ["Cust_00215", "103", "Cust_00215_002"]]}, "ctw_licence_module": {"columns": ["customer_id", "module_name"], "rows": [["Cust_00101", "compliance"], ["Cust_00101", "vulnerabilities"], ["Cust_00101", "alerting"], ["Cust_00101", "mobile_access"], ["Cust_00101", "news_breach_watch"], ["Cust_00101", "incidents"], ["Cust_00202", "compliance"], ["Cust_00206", "compliance"], ["Cust_00206", "vulnerabilities"], ["Cust_00206", "alerting"], ["Cust_00206", "news_breach_watch"], ["Cust_00210", "compliance"], ["Cust_00210", "vulnerabilities"], ["Cust_00210", "alerting"], ["Cust_00210", "news_breach_watch"], ["Cust_00215", "compliance"], ["Cust_00215", "vulnerabilities"], ["Cust_00215", "alerting"]]}, "ctw_migration": {"columns": ["name", "applied_at"], "rows": [["001_ctw_schema", "2026-10-21 05:57:37.181358+00"], ["002_security", "2026-10-21 05:57:37.183948+00"], ["003_drafts", "2026-10-21 13:12:38.961194+00"]]}, "ctw_module": {"columns": ["module_name", "mandatory", "sort_order"], "rows": [["compliance", "True", "0"], ["vulnerabilities", "False", "1"], ["alerting", "False", "2"], ["mobile_access", "False", "3"], ["news_breach_watch", "False", "4"], ["onprem_ai_assessment", "False", "5"], ["incidents", "False", "6"]]}};
+      currentDatabase = sample;
+      document.getElementById('activeFileName').textContent = 'ctw.sql (Sample - 18 Tables)';
+      document.getElementById('activeFileBadge').style.display = 'inline-flex';
+      uploadOverlay.classList.add('hidden');
+      initDatabaseView();
+      showToast('Loaded sample ctw.sql successfully!');
+    }
+  </script>
+</body>
+</html>
