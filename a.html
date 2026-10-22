@@ -1000,318 +1000,260 @@
       reader.readAsText(file);
     }
 
-    // High Performance SQL Parser
+    // ─── SQL parser ─────────────────────────────────────────────────────────────────────────
+    // Reads PostgreSQL / MySQL / SQLite dumps: CREATE TABLE gives the columns; INSERT INTO ... VALUES rows are
+    // placed by the column names the INSERT lists (an INSERT may list only some columns, in any order);
+    // pg_dump COPY ... FROM stdin blocks are read too. Strings follow standard SQL: '' is a quote, a backslash
+    // is a plain character except in E'...' strings. Values keep their text; NULL stays empty.
+
     function parseSQLDump(sqlText) {
-      const statements = splitSQLStatements(sqlText);
       const tables = {};
+      const tableFor = (name) => (tables[name] ||= { columns: [], rows: [] });
 
-      // CREATE TABLE
-      for (const stmt of statements) {
-        const createMatch = stmt.match(/^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:["`\w]+\.)?["`]?([a-zA-Z0-9_]+)["`]?\s*\(([\s\S]*)\)$/i);
-        if (createMatch) {
-          const tblName = createMatch[1];
-          const body = createMatch[2];
-          const columns = [];
-          const lines = body.split('\n');
-          for (let rawLine of lines) {
-            let line = rawLine.trim().replace(/,$/, '');
-            if (!line || line.startsWith('--') || line.startsWith('/*')) continue;
-            const upper = line.toUpperCase();
-            if (
-              upper.startsWith('CONSTRAINT') ||
-              upper.startsWith('PRIMARY KEY') ||
-              upper.startsWith('FOREIGN KEY') ||
-              upper.startsWith('UNIQUE') ||
-              upper.startsWith('CHECK') ||
-              upper.startsWith('KEY ') ||
-              upper.startsWith('INDEX ')
-            ) {
-              continue;
-            }
-            const colMatch = line.match(/^["`]?([a-zA-Z0-9_]+)["`]?/);
-            if (colMatch && !columns.includes(colMatch[1])) {
-              columns.push(colMatch[1]);
-            }
+      for (const stmt of splitSQLStatements(sqlText)) {
+        const sql = stmt.sql;
+
+        const create = sql.match(/^CREATE\s+(?:UNLOGGED\s+|TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([^\s(]+)\s*\(([\s\S]*)\)[^)]*$/i);
+        if (create) {
+          const t = tableFor(tableName(create[1]));
+          for (const item of splitTopLevel(create[2], ',')) {
+            const def = item.trim();
+            if (!def || /^(CONSTRAINT|PRIMARY\s+KEY|FOREIGN\s+KEY|UNIQUE|CHECK|EXCLUDE|KEY\s|INDEX\s|LIKE\s)/i.test(def)) continue;
+            const col = identifier(def);
+            if (col && !t.columns.includes(col)) t.columns.push(col);
           }
-          if (!tables[tblName]) {
-            tables[tblName] = { columns, rows: [] };
-          } else if (tables[tblName].columns.length === 0) {
-            tables[tblName].columns = columns;
-          }
+          continue;
+        }
+
+        // ALTER TABLE ... ADD COLUMN x type: a column added after the CREATE
+        const addCol = sql.match(/^ALTER\s+TABLE\s+(?:ONLY\s+)?([^\s]+)\s+ADD\s+(?:COLUMN\s+)?(?:IF\s+NOT\s+EXISTS\s+)?("[^"]+"|`[^`]+`|[A-Za-z_][\w$]*)\s+(?!CONSTRAINT)/i);
+        if (addCol && !/\bADD\s+CONSTRAINT\b/i.test(sql)) {
+          const t = tableFor(tableName(addCol[1]));
+          const col = identifier(addCol[2]);
+          if (col && !t.columns.includes(col)) t.columns.push(col);
+          continue;
+        }
+
+        const insert = sql.match(/^INSERT\s+INTO\s+([^\s(]+)\s*(\(([^)]*)\))?\s*VALUES\s*([\s\S]*?)(\s+ON\s+CONFLICT[\s\S]*|\s+RETURNING[\s\S]*)?$/i);
+        if (insert) {
+          const t = tableFor(tableName(insert[1]));
+          const cols = insert[3] ? splitTopLevel(insert[3], ',').map((c) => identifier(c.trim())) : null;
+          for (const tuple of extractTuples(insert[4])) addRow(t, cols, parseValueTuple(tuple));
+          continue;
+        }
+
+        const copy = sql.match(/^COPY\s+([^\s(]+)\s*(?:\(([^)]*)\))?\s+FROM\s+stdin/i);
+        if (copy && stmt.copyData !== undefined) {
+          const t = tableFor(tableName(copy[1]));
+          const cols = copy[2] ? splitTopLevel(copy[2], ',').map((c) => identifier(c.trim())) : null;
+          for (const line of stmt.copyData) addRow(t, cols, line.split('\t').map(copyValue));
         }
       }
 
-      // INSERT INTO
-      for (const stmt of statements) {
-        const insertMatch = stmt.match(/^INSERT\s+INTO\s+(?:["`\w]+\.)?["`]?([a-zA-Z0-9_]+)["`]?\s*(?:\(([\s\S]*?)\))?\s*VALUES\s*([\s\S]*)$/i);
-        if (insertMatch) {
-          const tblName = insertMatch[1];
-          const explicitCols = insertMatch[2]
-            ? insertMatch[2].split(',').map(c => c.trim().replace(/["`]/g, ''))
-            : null;
-          const valuesBody = insertMatch[3];
-
-          if (!tables[tblName]) {
-            tables[tblName] = { columns: explicitCols || [], rows: [] };
-          } else if (explicitCols && tables[tblName].columns.length === 0) {
-            tables[tblName].columns = explicitCols;
-          }
-
-          const tuples = extractTuples(valuesBody);
-          for (const t of tuples) {
-            const row = parseValueTuple(t);
-            tables[tblName].rows.push(row);
-          }
-        }
+      for (const name in tables) {
+        const t = tables[name];
+        let width = t.columns.length;   // a loop, not Math.max(...rows): tables can have 100,000+ rows
+        for (const r of t.rows) if (r.length > width) width = r.length;
+        for (let i = t.columns.length; i < width; i++) t.columns.push(`col_${i + 1}`);
+        t.rows = t.rows.map((r) => (r.length < width ? r.concat(Array(width - r.length).fill(null)) : r));
       }
-
-      // Generate column names if empty
-      for (const tbl in tables) {
-        const t = tables[tbl];
-        if (t.columns.length === 0 && t.rows.length > 0) {
-          const maxLen = Math.max(...t.rows.map(r => r.length));
-          t.columns = Array.from({ length: maxLen }, (_, i) => `col_${i + 1}`);
-        }
-      }
-
       currentDatabase = tables;
     }
 
-    function splitSQLStatements(sql) {
-      const statements = [];
-      let current = [];
-      let inString = false;
-      let quoteChar = '';
-      let inLineComment = false;
-      let inBlockComment = false;
-      let inDollarQuote = false;
-      let dollarTag = '';
-      const n = sql.length;
-      let i = 0;
-
-      while (i < n) {
-        const c = sql[i];
-        const next = i + 1 < n ? sql[i + 1] : '';
-
-        if (inLineComment) {
-          if (c === '\n') inLineComment = false;
-          i++;
-          continue;
-        }
-        if (inBlockComment) {
-          if (c === '*' && next === '/') {
-            inBlockComment = false;
-            i += 2;
-            continue;
-          }
-          i++;
-          continue;
-        }
-        if (inDollarQuote) {
-          if (sql.startsWith(dollarTag, i)) {
-            current.push(dollarTag);
-            i += dollarTag.length;
-            inDollarQuote = false;
-            continue;
-          }
-          current.push(c);
-          i++;
-          continue;
-        }
-
-        if (inString) {
-          current.push(c);
-          if (c === quoteChar) {
-            if (quoteChar === "'" && next === "'") {
-              current.push("'");
-              i += 2;
-              continue;
-            } else {
-              inString = false;
-            }
-          } else if (c === '\\') {
-            if (i + 1 < n) {
-              current.push(next);
-              i += 2;
-              continue;
-            }
-          }
-          i++;
-          continue;
-        }
-
-        if (c === '-' && next === '-') {
-          inLineComment = true;
-          i += 2;
-          continue;
-        }
-        if (c === '/' && next === '*') {
-          inBlockComment = true;
-          i += 2;
-          continue;
-        }
-        if (c === "'" || c === '"') {
-          inString = true;
-          quoteChar = c;
-          current.push(c);
-          i++;
-          continue;
-        }
-        if (c === '$') {
-          const match = sql.slice(i).match(/^\$([a-zA-Z0-9_]*)\$/);
-          if (match) {
-            dollarTag = match[0];
-            inDollarQuote = true;
-            current.push(dollarTag);
-            i += dollarTag.length;
-            continue;
-          }
-        }
-
-        if (c === ';') {
-          const stmt = current.join('').trim();
-          if (stmt) statements.push(stmt);
-          current = [];
-          i++;
-          continue;
-        }
-
-        current.push(c);
-        i++;
+    // One row into a table: by column name when the statement lists them, else in table order.
+    function addRow(t, cols, values) {
+      if (!cols) {
+        t.rows.push(values);
+        return;
       }
-      const last = current.join('').trim();
-      if (last) statements.push(last);
-      return statements;
+      const row = Array(t.columns.length).fill(null);
+      cols.forEach((c, i) => {
+        let at = t.columns.indexOf(c);
+        if (at < 0) {
+          t.columns.push(c);
+          t.rows.forEach((r) => r.push(null));
+          row.push(null);
+          at = t.columns.length - 1;
+        }
+        row[at] = i < values.length ? values[i] : null;
+      });
+      t.rows.push(row);
     }
 
-    function extractTuples(body) {
-      const tuples = [];
-      let inParen = false;
-      let inQuote = false;
-      let current = [];
+    // public.ctw_client / "public"."ctw_client" / `db`.`t` -> ctw_client
+    function tableName(raw) {
+      const parts = splitTopLevel(raw, '.');
+      return identifier(parts[parts.length - 1].trim());
+    }
+
+    function identifier(text) {
+      const m = text.match(/^\s*(?:"((?:[^"]|"")+)"|`([^`]+)`|\[([^\]]+)\]|([A-Za-z_][\w$]*))/);
+      if (!m) return null;
+      return m[1] !== undefined ? m[1].replace(/""/g, '"') : m[2] || m[3] || m[4];
+    }
+
+    // Statements, ignoring comments and psql meta-commands (\connect, \restrict ...); a COPY ... FROM stdin
+    // statement carries the data lines that follow it, up to "\.".
+    function splitSQLStatements(sql) {
+      const out = [];
+      const n = sql.length;
       let i = 0;
-      const n = body.length;
-
+      let start = 0;
+      let buf = '';
+      let lineStart = true;
       while (i < n) {
-        const c = body[i];
-        const next = i + 1 < n ? body[i + 1] : '';
-
-        if (inQuote) {
-          current.push(c);
-          if (c === "'") {
-            if (next === "'") {
-              current.push("'");
-              i += 2;
-              continue;
-            } else {
-              inQuote = false;
-            }
-          } else if (c === '\\' && next) {
-            current.push(next);
-            i += 2;
+        const c = sql[i];
+        const next = sql[i + 1];
+        if (lineStart && c === '\\') {                     // psql meta-command line
+          const eol = sql.indexOf('\n', i);
+          i = eol < 0 ? n : eol + 1;
+          continue;
+        }
+        lineStart = false;
+        if (c === '-' && next === '-') {                    // line comment
+          const eol = sql.indexOf('\n', i);
+          i = eol < 0 ? n : eol;
+          continue;
+        }
+        if (c === '/' && next === '*') {                    // block comment
+          const end = sql.indexOf('*/', i + 2);
+          i = end < 0 ? n : end + 2;
+          buf += ' ';
+          continue;
+        }
+        if (c === "'" || c === '"' || c === '`') {           // quoted text or identifier
+          const end = quoteEnd(sql, i);
+          buf += sql.slice(i, end);
+          i = end;
+          continue;
+        }
+        if (c === '$') {                                    // $tag$ ... $tag$
+          const tag = sql.slice(i).match(/^\$([A-Za-z_]\w*)?\$/);
+          if (tag) {
+            const end = sql.indexOf(tag[0], i + tag[0].length);
+            const stop = end < 0 ? n : end + tag[0].length;
+            buf += sql.slice(i, stop);
+            i = stop;
             continue;
           }
-          i++;
-          continue;
         }
-
-        if (c === "'") {
-          inQuote = true;
-          current.push(c);
+        if (c === ';') {
+          const stmt = { sql: buf.trim() };
           i++;
-          continue;
-        }
-
-        if (c === '(') {
-          if (!inParen) {
-            inParen = true;
-            current = [];
-          } else {
-            current.push(c);
+          if (/^COPY\s[\s\S]*\bFROM\s+stdin\b/i.test(stmt.sql)) {
+            const data = [];
+            let p = sql.indexOf('\n', i) + 1;
+            while (p > 0 && p < n) {
+              let eol = sql.indexOf('\n', p);
+              if (eol < 0) eol = n;
+              const line = sql.slice(p, eol).replace(/\r$/, '');
+              p = eol + 1;
+              if (line === '\\.') break;
+              data.push(line);
+            }
+            stmt.copyData = data;
+            i = Math.min(p, n);
           }
-          i++;
+          if (stmt.sql) out.push(stmt);
+          buf = '';
+          lineStart = true;
           continue;
         }
-
-        if (c === ')') {
-          if (inParen) {
-            tuples.push(current.join(''));
-            inParen = false;
-            current = [];
-          } else {
-            current.push(c);
-          }
-          i++;
-          continue;
-        }
-
-        if (inParen) {
-          current.push(c);
-        }
+        if (c === '\n') lineStart = true;
+        else if (c !== ' ' && c !== '\t' && c !== '\r') lineStart = false;
+        buf += c;
         i++;
+      }
+      if (buf.trim()) out.push({ sql: buf.trim() });
+      return out;
+    }
+
+    // Index just after the quoted text starting at i ('...', E'...', "...", `...`).
+    function quoteEnd(s, i) {
+      const q = s[i];
+      const escapes = q === "'" && i > 0 && /[eE]/.test(s[i - 1]) && !/[\w$]/.test(s[i - 2] || '');
+      let j = i + 1;
+      while (j < s.length) {
+        if (escapes && s[j] === '\\') { j += 2; continue; }
+        if (s[j] === q) {
+          if (s[j + 1] === q) { j += 2; continue; }
+          return j + 1;
+        }
+        j++;
+      }
+      return s.length;
+    }
+
+    // Parts of text split at `sep`, outside quotes and brackets.
+    function splitTopLevel(text, sep) {
+      const parts = [];
+      let depth = 0;
+      let from = 0;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === "'" || c === '"' || c === '`') { i = quoteEnd(text, i) - 1; continue; }
+        if (c === '(' || c === '[') depth++;
+        else if (c === ')' || c === ']') depth--;
+        else if (c === sep && depth === 0) { parts.push(text.slice(from, i)); from = i + 1; }
+      }
+      parts.push(text.slice(from));
+      return parts;
+    }
+
+    // "(...), (...)" -> the text inside each top-level pair of brackets.
+    function extractTuples(body) {
+      const tuples = [];
+      let depth = 0;
+      let from = -1;
+      for (let i = 0; i < body.length; i++) {
+        const c = body[i];
+        if (c === "'" || c === '"') { i = quoteEnd(body, i) - 1; continue; }
+        if (c === '(') { if (depth++ === 0) from = i + 1; }
+        else if (c === ')' && --depth === 0) tuples.push(body.slice(from, i));
       }
       return tuples;
     }
 
     function parseValueTuple(tupleStr) {
-      const values = [];
-      let inQuote = false;
-      let current = [];
-      let i = 0;
-      const n = tupleStr.length;
+      return splitTopLevel(tupleStr, ',').map((v) => sqlValue(v.trim()));
+    }
 
-      while (i < n) {
-        const c = tupleStr[i];
-        const next = i + 1 < n ? tupleStr[i + 1] : '';
-
-        if (inQuote) {
-          if (c === "'") {
-            if (next === "'") {
-              current.push("'");
-              i += 2;
-              continue;
-            } else {
-              inQuote = false;
-              i++;
-              continue;
-            }
-          } else if (c === '\\' && next) {
-            current.push(next);
-            i += 2;
-            continue;
-          }
-          current.push(c);
-          i++;
-          continue;
+    // One SQL value -> its text: 'a''b' -> a'b, E'x\ny' -> x(newline)y, '5'::integer -> 5, NULL -> null,
+    // ARRAY['a','b']::text[] -> a, b. Anything else (an expression) is kept as written.
+    function sqlValue(v) {
+      if (!v || /^NULL$/i.test(v)) return null;
+      v = v.replace(/(::\s*[\w ."]+(\[\])*)+$/, '').trim();       // casts
+      if (/^NULL$/i.test(v)) return null;
+      const str = v.match(/^([eEnN])?'([\s\S]*)'$/);
+      if (str && quoteEnd(v, v.indexOf("'")) === v.length) {
+        let s = str[2].replace(/''/g, "'");
+        if (str[1] && /e/i.test(str[1])) {
+          s = s.replace(/\\(x[0-9a-fA-F]{1,2}|u[0-9a-fA-F]{4}|[0-7]{1,3}|.)/g, (_, e) => {
+            const map = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' };
+            if (map[e]) return map[e];
+            if (e[0] === 'x' && e.length > 1) return String.fromCharCode(parseInt(e.slice(1), 16));
+            if (e[0] === 'u' && e.length === 5) return String.fromCharCode(parseInt(e.slice(1), 16));
+            if (/^[0-7]+$/.test(e)) return String.fromCharCode(parseInt(e, 8));
+            return e;
+          });
         }
-
-        if (c === "'") {
-          inQuote = true;
-          i++;
-          continue;
-        }
-
-        if (c === ',') {
-          values.push(cleanVal(current.join('').trim()));
-          current = [];
-          i++;
-          continue;
-        }
-
-        current.push(c);
-        i++;
+        return s;
       }
-      if (current.length > 0) {
-        values.push(cleanVal(current.join('').trim()));
-      }
-      return values;
+      const arr = v.match(/^ARRAY\s*\[([\s\S]*)\]$/i);
+      if (arr) return splitTopLevel(arr[1], ',').map((x) => sqlValue(x.trim())).filter((x) => x !== null).join(', ');
+      if (/^TRUE$/i.test(v)) return true;
+      if (/^FALSE$/i.test(v)) return false;
+      return v;
+    }
+
+    // A COPY text-format field: \N is NULL, backslash escapes, t / f booleans stay as written.
+    function copyValue(v) {
+      if (v === '\\N') return null;
+      return v.replace(/\\(.)/g, (_, e) => ({ n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v' }[e] ?? e));
     }
 
     function cleanVal(v) {
-      if (v === '' || v.toUpperCase() === 'NULL') return null;
-      if (v.toLowerCase() === 'true') return true;
-      if (v.toLowerCase() === 'false') return false;
-      return v;
+      return sqlValue(v);
     }
 
     // CSV and JSON parsers
